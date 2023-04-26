@@ -4,6 +4,8 @@ Proxmox Cloud Module
 
 .. versionadded:: 2014.7.0
 
+.. versionchanged:: 3006.0
+
 The Proxmox cloud module is used to control access to cloud providers using
 the Proxmox system (KVM / OpenVZ / LXC).
 

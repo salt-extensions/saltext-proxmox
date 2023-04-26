@@ -3,7 +3,7 @@ from pathlib import Path
 
 import setuptools
 
-version_path = Path(__file__).parent / "src" / "saltext" / "azurerm" / "version.py"
+version_path = Path(__file__).parent / "src" / "saltext" / "proxmox" / "version.py"
 
 with version_path.open() as f:
     for line in f:
