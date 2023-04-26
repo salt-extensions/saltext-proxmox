@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=58.3.0,<67.0.0", "wheel", "setuptools-declarative-requirements", "setuptools_scm[toml]>=3.4"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 100
+
+[tool.towncrier]
+    package = "saltext.proxmox"
+    filename = "CHANGELOG.md"
+    directory = "changelog/"
+    start_string = "# Changelog\n"
+
+    [[tool.towncrier.type]]
+        directory = "removed"
+        name = "Removed"
+        showcontent = true
+
+    [[tool.towncrier.type]]
+        directory = "deprecated"
+        name = "Deprecated"
+        showcontent = true
+
+    [[tool.towncrier.type]]
+        directory = "changed"
+        name = "Changed"
+        showcontent = true
+
+    [[tool.towncrier.type]]
+        directory = "fixed"
+        name = "Fixed"
+        showcontent = true
+
+    [[tool.towncrier.type]]
+        directory = "added"
+        name = "Added"
+        showcontent = true
+
+    [[tool.towncrier.type]]
+        directory = "security"
+        name = "Security"
+        showcontent = true
