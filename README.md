@@ -2,7 +2,7 @@
 
 [![Documentation Status](https://readthedocs.org/projects/saltext-proxmox/badge/?version=latest)](https://saltext-proxmox.readthedocs.io/en/latest/?badge=latest)
 
-This is a collection of Salt extension modules for use with  Microsoft Azure Resource Manager
+This is a collection of Salt extension modules for use with Proxmox PVE.
 
 ## Security
 
