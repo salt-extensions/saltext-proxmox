@@ -27,7 +27,6 @@ Set up the cloud configuration at ``/etc/salt/cloud.providers`` or
 :depends: requests >= 2.2.1
 :depends: IPy >= 0.81
 """
-
 import logging
 import pprint
 import re
@@ -38,11 +37,9 @@ import urllib
 import salt.config as config
 import salt.utils.cloud
 import salt.utils.json
-from salt.exceptions import (
-    SaltCloudExecutionFailure,
-    SaltCloudExecutionTimeout,
-    SaltCloudSystemExit,
-)
+from salt.exceptions import SaltCloudExecutionFailure
+from salt.exceptions import SaltCloudExecutionTimeout
+from salt.exceptions import SaltCloudSystemExit
 
 try:
     import requests
@@ -394,9 +391,7 @@ def script(vm_):
         script_name,
         vm_,
         __opts__,
-        salt.utils.cloud.salt_config_to_yaml(
-            salt.utils.cloud.minion_config(__opts__, vm_)
-        ),
+        salt.utils.cloud.salt_config_to_yaml(salt.utils.cloud.minion_config(__opts__, vm_)),
     )
 
 
@@ -445,9 +440,7 @@ def avail_images(call=None, location="local"):
 
     ret = {}
     for host_name, host_details in avail_locations().items():
-        for item in query(
-            "get", "nodes/{}/storage/{}/content".format(host_name, location)
-        ):
+        for item in query("get", "nodes/{}/storage/{}/content".format(host_name, location)):
             ret[item["volid"]] = item
     return ret
 
@@ -463,9 +456,7 @@ def list_nodes(call=None):
         salt-cloud -Q my-proxmox-config
     """
     if call == "action":
-        raise SaltCloudSystemExit(
-            "The list_nodes function must be called with -f or --function."
-        )
+        raise SaltCloudSystemExit("The list_nodes function must be called with -f or --function.")
 
     ret = {}
     for vm_name, vm_details in get_resources_vms(includeConfig=True).items():
@@ -483,10 +474,7 @@ def list_nodes(call=None):
         private_ips = []
         public_ips = []
 
-        if (
-            "ip_address" in vm_details["config"]
-            and vm_details["config"]["ip_address"] != "-"
-        ):
+        if "ip_address" in vm_details["config"] and vm_details["config"]["ip_address"] != "-":
             ips = vm_details["config"]["ip_address"].split(" ")
             for ip_ in ips:
                 if IP(ip_).iptype() == "PRIVATE":
@@ -671,10 +659,7 @@ def create(vm_):
         data = create_node(vm_, newid)
     except Exception as exc:  # pylint: disable=broad-except
         msg = str(exc)
-        if (
-            isinstance(exc, requests.exceptions.RequestException)
-            and exc.response is not None
-        ):
+        if isinstance(exc, requests.exceptions.RequestException) and exc.response is not None:
             msg = msg + "\n" + exc.response.text
         log.error(
             "Error creating %s on PROXMOX\n\n"
@@ -727,9 +712,7 @@ def create(vm_):
 
     if agent_get_ip is True:
         try:
-            ip_address = salt.utils.cloud.wait_for_fun(
-                _find_agent_ip, vm_=vm_, vmid=vmid
-            )
+            ip_address = salt.utils.cloud.wait_for_fun(_find_agent_ip, vm_=vm_, vmid=vmid)
         except (SaltCloudExecutionTimeout, SaltCloudExecutionFailure) as exc:
             try:
                 # If VM was created but we can't connect, destroy it.
@@ -741,9 +724,7 @@ def create(vm_):
 
         log.debug("Using IP address %s", ip_address)
 
-    ssh_username = config.get_cloud_config_value(
-        "ssh_username", vm_, __opts__, default="root"
-    )
+    ssh_username = config.get_cloud_config_value("ssh_username", vm_, __opts__, default="root")
     ssh_password = config.get_cloud_config_value(
         "password",
         vm_,
@@ -919,10 +900,7 @@ def create_node(vm_, newid):
 
     if vm_["technology"] not in ["qemu", "openvz", "lxc"]:
         # Wrong VM type given
-        log.error(
-            "Wrong VM type. Valid options are: qemu, openvz (proxmox3) or lxc"
-            " (proxmox4)"
-        )
+        log.error("Wrong VM type. Valid options are: qemu, openvz (proxmox3) or lxc" " (proxmox4)")
         raise SaltCloudExecutionFailure
 
     if "host" not in vm_:
@@ -992,9 +970,7 @@ def create_node(vm_, newid):
 
         # inform user the "disk" option is not supported for LXC hosts
         if "disk" in vm_:
-            log.warning(
-                'The "disk" option is not supported for LXC hosts and was ignored'
-            )
+            log.warning('The "disk" option is not supported for LXC hosts and was ignored')
 
         # LXC specific network config
         # OpenVZ allowed specifying IP and gateway. To ease migration from
@@ -1002,9 +978,7 @@ def create_node(vm_, newid):
         # If you need more control, please use the net0 option directly.
         # This also assumes a /24 subnet.
         if "ip_address" in vm_ and "net0" not in vm_:
-            newnode["net0"] = (
-                "bridge=vmbr0,ip=" + vm_["ip_address"] + "/24,name=eth0,type=veth"
-            )
+            newnode["net0"] = "bridge=vmbr0,ip=" + vm_["ip_address"] + "/24,name=eth0,type=veth"
 
             # gateway is optional and does not assume a default
             if "gw" in vm_:
@@ -1034,9 +1008,7 @@ def create_node(vm_, newid):
         "requesting instance",
         "salt/cloud/{}/requesting".format(vm_["name"]),
         args={
-            "kwargs": __utils__["cloud.filter_event"](
-                "requesting", newnode, list(newnode)
-            ),
+            "kwargs": __utils__["cloud.filter_event"]("requesting", newnode, list(newnode)),
         },
         sock_dir=__opts__["sock_dir"],
     )
@@ -1049,9 +1021,7 @@ def create_node(vm_, newid):
             postParams["pool"] = vm_["pool"]
 
         for prop in "description", "format", "full", "name":
-            if (
-                "clone_" + prop in vm_
-            ):  # if the property is set, use it for the VM request
+            if "clone_" + prop in vm_:  # if the property is set, use it for the VM request
                 postParams[prop] = vm_["clone_" + prop]
 
         try:
@@ -1081,9 +1051,7 @@ def show_instance(name, call=None):
     Show the details from Proxmox concerning an instance
     """
     if call != "action":
-        raise SaltCloudSystemExit(
-            "The show_instance action must be called with -a or --action."
-        )
+        raise SaltCloudSystemExit("The show_instance action must be called with -a or --action.")
 
     nodes = list_nodes_full()
     __utils__["cloud.cache_node"](nodes[name], _get_active_provider_name(), __opts__)
@@ -1114,9 +1082,7 @@ def wait_for_created(upid, timeout=300):
     start_time = time.time()
     info = _lookup_proxmox_task(upid)
     if not info:
-        log.error(
-            "wait_for_created: No task information retrieved based on given criteria."
-        )
+        log.error("wait_for_created: No task information retrieved based on given criteria.")
         raise SaltCloudExecutionFailure
 
     while True:
@@ -1146,14 +1112,10 @@ def wait_for_state(vmid, state, timeout=300):
             return True
         time.sleep(1)
         if time.time() - start_time > timeout:
-            log.debug(
-                "Timeout reached while waiting for %s to become %s", node["name"], state
-            )
+            log.debug("Timeout reached while waiting for %s to become %s", node["name"], state)
             return False
         node = get_vm_status(vmid=vmid)
-        log.debug(
-            'State for %s is: "%s" instead of "%s"', node["name"], node["status"], state
-        )
+        log.debug('State for %s is: "%s" instead of "%s"', node["name"], node["status"], state)
 
 
 def destroy(name, call=None):
@@ -1231,9 +1193,7 @@ def set_vm_status(status, name=None, vmid=None):
     log.debug("VM_STATUS: Has desired info (%s). Setting status..", vmobj)
     data = query(
         "post",
-        "nodes/{}/{}/{}/status/{}".format(
-            vmobj["node"], vmobj["type"], vmobj["vmid"], status
-        ),
+        "nodes/{}/{}/{}/status/{}".format(vmobj["node"], vmobj["type"], vmobj["vmid"], status),
     )
 
     result = _parse_proxmox_upid(data, vmobj)
@@ -1265,9 +1225,7 @@ def get_vm_status(vmid=None, name=None):
         log.debug("VM_STATUS: Has desired info. Retrieving.. (%s)", vmobj["name"])
         data = query(
             "get",
-            "nodes/{}/{}/{}/status/current".format(
-                vmobj["node"], vmobj["type"], vmobj["vmid"]
-            ),
+            "nodes/{}/{}/{}/status/current".format(vmobj["node"], vmobj["type"], vmobj["vmid"]),
         )
         return data
 
@@ -1286,9 +1244,7 @@ def start(name, vmid=None, call=None):
         salt-cloud -a start mymachine
     """
     if call != "action":
-        raise SaltCloudSystemExit(
-            "The start action must be called with -a or --action."
-        )
+        raise SaltCloudSystemExit("The start action must be called with -a or --action.")
 
     log.debug("Start: %s (%s) = Start", name, vmid)
     if not set_vm_status("start", name, vmid=vmid):
@@ -1333,9 +1289,7 @@ def shutdown(name=None, vmid=None, call=None):
         salt-cloud -a shutdown mymachine
     """
     if call != "action":
-        raise SaltCloudSystemExit(
-            "The shutdown action must be called with -a or --action."
-        )
+        raise SaltCloudSystemExit("The shutdown action must be called with -a or --action.")
 
     if not set_vm_status("shutdown", name, vmid=vmid):
         log.error("Unable to shut VM %s (%s) down..", name, vmid)

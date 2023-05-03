@@ -11,42 +11,30 @@
     Note: mock >= 2.0.0 required since unittest.mock does not have
     MagicMock.assert_called in Python < 3.6.
 """
-# pylint: disable=unused-import,function-redefined,blacklisted-module,blacklisted-external-module
-
-
+# pylint: disable=unused-import,function-redefined
 import copy
 import errno
 import fnmatch
 import sys
-
-# By these days, we should blowup if mock is not available
-import mock  # pylint: disable=blacklisted-external-import
-
-# pylint: disable=no-name-in-module,no-member
-from mock import (
-    ANY,
-    DEFAULT,
-    FILTER_DIR,
-    MagicMock,
-    Mock,
-    NonCallableMagicMock,
-    NonCallableMock,
-    PropertyMock,
-    __version__,
-    call,
-    create_autospec,
-    patch,
-    sentinel,
-)
+from unittest.mock import ANY
+from unittest.mock import call
+from unittest.mock import create_autospec
+from unittest.mock import DEFAULT
+from unittest.mock import FILTER_DIR
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import NonCallableMagicMock
+from unittest.mock import NonCallableMock
+from unittest.mock import patch
+from unittest.mock import PropertyMock
+from unittest.mock import sentinel
 
 import salt.utils.stringutils
 
+# By these days, we should blowup if mock is not available
 # pylint: disable=no-name-in-module,no-member
 
-
-__mock_version = tuple(
-    int(part) for part in mock.__version__.split(".") if part.isdigit()
-)  # pylint: disable=no-member
+# pylint: disable=no-name-in-module,no-member
 
 
 class MockFH:
@@ -120,17 +108,13 @@ class MockFH:
                 if not isinstance(self.read_data, bytes):
                     raise TypeError(
                         "{} opened in binary mode, expected read_data to be "
-                        "bytes, not {}".format(
-                            self.filename, type(self.read_data).__name__
-                        )
+                        "bytes, not {}".format(self.filename, type(self.read_data).__name__)
                     )
             else:
                 if not isinstance(self.read_data, str):
                     raise TypeError(
                         "{} opened in non-binary mode, expected read_data to "
-                        "be str, not {}".format(
-                            self.filename, type(self.read_data).__name__
-                        )
+                        "be str, not {}".format(self.filename, type(self.read_data).__name__)
                     )
             # No need to repeat this the next time we check
             self.__read_data_ok = True
@@ -196,9 +180,7 @@ class MockFH:
             content_type = type(content)
             if self.binary_mode and content_type is not bytes:
                 raise TypeError(
-                    "a bytes-like object is required, not '{}'".format(
-                        content_type.__name__
-                    )
+                    "a bytes-like object is required, not '{}'".format(content_type.__name__)
                 )
             elif not self.binary_mode and content_type is not str:
                 raise TypeError(

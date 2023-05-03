@@ -1,17 +1,19 @@
 """
     :codeauthor: Tyler Johnson <tjohnson@saltstack.com>
 """
-
 import io
 import textwrap
 import urllib
 
 import pytest
 import requests
-
 from salt import config
 from salt.cloud.clouds import proxmox
-from tests.support.mock import ANY, MagicMock, call, patch
+
+from tests.support.mock import ANY
+from tests.support.mock import call
+from tests.support.mock import MagicMock
+from tests.support.mock import patch
 
 
 @pytest.fixture
@@ -79,9 +81,7 @@ def test__stringlist_to_dictionary():
     result = proxmox._stringlist_to_dictionary("")
     assert result == {}
 
-    result = proxmox._stringlist_to_dictionary(
-        "foo=bar, ignored_space=bar,internal space=bar"
-    )
+    result = proxmox._stringlist_to_dictionary("foo=bar, ignored_space=bar,internal space=bar")
     assert result == {"foo": "bar", "ignored_space": "bar", "internal space": "bar"}
 
     # Negative cases
@@ -109,9 +109,7 @@ def test__reconfigure_clone_net_hdd(vm):
     with patch(
         "salt.cloud.clouds.proxmox._get_properties",
         MagicMock(return_value=["net0", "ide0", "sata0", "scsi0"]),
-    ), patch.object(
-        proxmox, "query", return_value={"net0": "c=overwritten,g=h"}
-    ) as query:
+    ), patch.object(proxmox, "query", return_value={"net0": "c=overwritten,g=h"}) as query:
         # Test a vm that lacks the required attributes
         proxmox._reconfigure_clone({}, 0)
         query.assert_not_called()
@@ -121,18 +119,12 @@ def test__reconfigure_clone_net_hdd(vm):
 
         # net reconfigure
         query.assert_any_call("get", "nodes/127.0.0.1/qemu/0/config")
-        query.assert_any_call(
-            "post", "nodes/127.0.0.1/qemu/0/config", {"net0": "a=b,c=d,g=h"}
-        )
+        query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"net0": "a=b,c=d,g=h"})
 
         # hdd reconfigure
         query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"ide0": "data"})
-        query.assert_any_call(
-            "post", "nodes/127.0.0.1/qemu/0/config", {"sata0": "data"}
-        )
-        query.assert_any_call(
-            "post", "nodes/127.0.0.1/qemu/0/config", {"scsi0": "data"}
-        )
+        query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"sata0": "data"})
+        query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"scsi0": "data"})
 
 
 def test__reconfigure_clone_params():
@@ -194,9 +186,9 @@ def test_clone():
     Test that an integer value for clone_from
     """
     mock_query = MagicMock(return_value="")
-    with patch(
-        "salt.cloud.clouds.proxmox._get_properties", MagicMock(return_value=[])
-    ), patch("salt.cloud.clouds.proxmox.query", mock_query):
+    with patch("salt.cloud.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
+        "salt.cloud.clouds.proxmox.query", mock_query
+    ):
         vm_ = {
             "technology": "qemu",
             "name": "new2",
@@ -231,9 +223,9 @@ def test_clone_pool():
     Test that cloning a VM passes the pool parameter if present
     """
     mock_query = MagicMock(return_value="")
-    with patch(
-        "salt.cloud.clouds.proxmox._get_properties", MagicMock(return_value=[])
-    ), patch("salt.cloud.clouds.proxmox.query", mock_query):
+    with patch("salt.cloud.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
+        "salt.cloud.clouds.proxmox.query", mock_query
+    ):
         vm_ = {
             "technology": "qemu",
             "name": "new2",
@@ -271,10 +263,7 @@ def test_clone_id():
     with patch(
         "salt.cloud.clouds.proxmox._get_properties",
         MagicMock(return_value=["vmid"]),
-    ), patch(
-        "salt.cloud.clouds.proxmox._get_next_vmid",
-        MagicMock(return_value=next_vmid),
-    ), patch(
+    ), patch("salt.cloud.clouds.proxmox._get_next_vmid", MagicMock(return_value=next_vmid),), patch(
         "salt.cloud.clouds.proxmox.start", MagicMock(return_value=True)
     ), patch(
         "salt.cloud.clouds.proxmox.wait_for_state", mock_wait_for_state
@@ -475,9 +464,7 @@ def test_creation_failure_logging(caplog):
         "onboot": True,
     }
     assert (
-        config.is_profile_configured(
-            proxmox.__opts__, "my_proxmox:proxmox", "my_proxmox", vm_=vm_
-        )
+        config.is_profile_configured(proxmox.__opts__, "my_proxmox:proxmox", "my_proxmox", vm_=vm_)
         is True
     )
 
@@ -503,9 +490,7 @@ def test_creation_failure_logging(caplog):
 
         # Search for these messages in a multi-line log entry.
         missing = {
-            "{} Client Error: {} for url:".format(
-                response.status_code, response.reason
-            ),
+            "{} Client Error: {} for url:".format(response.status_code, response.reason),
             response.text,
         }
         for required in list(missing):
@@ -514,7 +499,5 @@ def test_creation_failure_logging(caplog):
                     missing.remove(required)
                     break
         if missing:
-            raise AssertionError(
-                "Did not find error messages: {}".format(sorted(list(missing)))
-            )
+            raise AssertionError("Did not find error messages: {}".format(sorted(list(missing))))
     return
