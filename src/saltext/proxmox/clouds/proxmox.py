@@ -417,7 +417,10 @@ def avail_locations(call=None):
     ret = {}
     for node in nodes:
         name = node["node"]
-        ret[name] = node
+        if node["status"] == "online":
+            ret[name] = node
+        else:
+            log.warning("Node %s is %s, ignoring it", name, node["status"])
 
     return ret
 
