@@ -158,6 +158,7 @@ def _authenticate():
 
     authenticated = True
 
+
 def query(conn_type, option, post_data=None):
     """
     Execute the HTTP request to the API
