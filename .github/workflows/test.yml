@@ -302,7 +302,7 @@ jobs:
         path: artifacts/runtests-*.log
 
   macOS:
-    runs-on: macOS-10.15
+    runs-on: macOS-12
     needs: Pre-Commit
 
     timeout-minutes: 40
