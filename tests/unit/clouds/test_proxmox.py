@@ -268,7 +268,10 @@ def test_clone_id():
     with patch(
         "saltext.proxmox.clouds.proxmox._get_properties",
         MagicMock(return_value=["vmid"]),
-    ), patch("saltext.proxmox.clouds.proxmox._get_next_vmid", MagicMock(return_value=next_vmid),), patch(
+    ), patch(
+        "saltext.proxmox.clouds.proxmox._get_next_vmid",
+        MagicMock(return_value=next_vmid),
+    ), patch(
         "saltext.proxmox.clouds.proxmox.start", MagicMock(return_value=True)
     ), patch(
         "saltext.proxmox.clouds.proxmox.wait_for_state", mock_wait_for_state
