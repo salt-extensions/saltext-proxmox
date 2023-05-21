@@ -146,7 +146,9 @@ def _authenticate():
         full_url = "https://{}:{}/api2/json/access/ticket".format(url, port)
         connect_data = {"username": username, "password": passwd}
 
-        returned_data = requests.post(full_url, verify=verify_ssl, data=connect_data).json()
+        response = requests.post(full_url, verify=verify_ssl, data=connect_data)
+        response.raise_for_status()
+        returned_data = response.json()
 
         ticket = {"PVEAuthCookie": returned_data["data"]["ticket"]}
         csrf = str(returned_data["data"]["CSRFPreventionToken"])

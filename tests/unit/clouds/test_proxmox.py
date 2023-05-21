@@ -8,13 +8,12 @@ import urllib
 import pytest
 import requests
 from salt import config
-from salt.cloud.clouds import proxmox
+from saltext.proxmox.clouds import proxmox
 
 from tests.support.mock import ANY
 from tests.support.mock import call
 from tests.support.mock import MagicMock
 from tests.support.mock import patch
-
 
 @pytest.fixture
 def profile():
@@ -77,6 +76,11 @@ def configure_loader_modules(profile, provider_config):
     }
 
 
+def test___virtual__():
+    result = proxmox.__virtual__()
+    assert result == "proxmox"
+
+
 def test__stringlist_to_dictionary():
     result = proxmox._stringlist_to_dictionary("")
     assert result == {}
@@ -105,9 +109,10 @@ def test__dictionary_to_stringlist():
 
 
 def test__reconfigure_clone_net_hdd(vm):
+
     # The return_value is for the net reconfigure assertions, it is irrelevant for the rest
     with patch(
-        "salt.cloud.clouds.proxmox._get_properties",
+        "saltext.proxmox.clouds.proxmox._get_properties",
         MagicMock(return_value=["net0", "ide0", "sata0", "scsi0"]),
     ), patch.object(proxmox, "query", return_value={"net0": "c=overwritten,g=h"}) as query:
         # Test a vm that lacks the required attributes
@@ -162,9 +167,9 @@ def test__reconfigure_clone_params():
 
     mock_query = MagicMock(return_value="")
     with patch(
-        "salt.cloud.clouds.proxmox._get_properties",
+        "saltext.proxmox.clouds.proxmox._get_properties",
         MagicMock(return_value=list(properties.keys())),
-    ), patch("salt.cloud.clouds.proxmox.query", mock_query):
+    ), patch("saltext.proxmox.clouds.proxmox.query", mock_query):
         vm_ = {
             "profile": "my_proxmox",
             "driver": "proxmox",
@@ -186,8 +191,8 @@ def test_clone():
     Test that an integer value for clone_from
     """
     mock_query = MagicMock(return_value="")
-    with patch("salt.cloud.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
-        "salt.cloud.clouds.proxmox.query", mock_query
+    with patch("saltext.proxmox.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
+        "saltext.proxmox.clouds.proxmox.query", mock_query
     ):
         vm_ = {
             "technology": "qemu",
@@ -223,8 +228,8 @@ def test_clone_pool():
     Test that cloning a VM passes the pool parameter if present
     """
     mock_query = MagicMock(return_value="")
-    with patch("salt.cloud.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
-        "salt.cloud.clouds.proxmox.query", mock_query
+    with patch("saltext.proxmox.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
+        "saltext.proxmox.clouds.proxmox.query", mock_query
     ):
         vm_ = {
             "technology": "qemu",
@@ -261,14 +266,14 @@ def test_clone_id():
 
     mock_wait_for_state = MagicMock(return_value=True)
     with patch(
-        "salt.cloud.clouds.proxmox._get_properties",
+        "saltext.proxmox.clouds.proxmox._get_properties",
         MagicMock(return_value=["vmid"]),
-    ), patch("salt.cloud.clouds.proxmox._get_next_vmid", MagicMock(return_value=next_vmid),), patch(
-        "salt.cloud.clouds.proxmox.start", MagicMock(return_value=True)
+    ), patch("saltext.proxmox.clouds.proxmox._get_next_vmid", MagicMock(return_value=next_vmid),), patch(
+        "saltext.proxmox.clouds.proxmox.start", MagicMock(return_value=True)
     ), patch(
-        "salt.cloud.clouds.proxmox.wait_for_state", mock_wait_for_state
+        "saltext.proxmox.clouds.proxmox.wait_for_state", mock_wait_for_state
     ), patch(
-        "salt.cloud.clouds.proxmox.query", side_effect=mock_query_response
+        "saltext.proxmox.clouds.proxmox.query", side_effect=mock_query_response
     ):
         vm_ = {
             "profile": "my_proxmox",
@@ -303,7 +308,7 @@ def test_find_agent_ips():
     """
 
     with patch(
-        "salt.cloud.clouds.proxmox.query",
+        "saltext.proxmox.clouds.proxmox.query",
         return_value={
             "result": [
                 {
@@ -351,6 +356,28 @@ def test_find_agent_ips():
         assert result == "2001::1:2"
 
 
+def test__authenticate_with_token():
+    """
+    Test the use of a token for Proxmox connection
+    """
+    get_cloud_config_mock = [
+        "proxmox.connection.url",
+        "9999",
+        "fakeuser",
+        None,
+        True,
+        "faketoken",
+    ]
+    requests_post_mock = MagicMock()
+    with patch(
+        "salt.config.get_cloud_config_value",
+        autospec=True,
+        side_effect=get_cloud_config_mock,
+    ), patch("requests.post", requests_post_mock):
+        proxmox._authenticate()
+        requests_post_mock.assert_not_called()
+
+
 def test__authenticate_with_custom_port():
     """
     Test the use of a custom port for Proxmox connection
@@ -360,6 +387,7 @@ def test__authenticate_with_custom_port():
         "9999",
         "fakeuser",
         "secretpassword",
+        None,
         True,
     ]
     requests_post_mock = MagicMock()
