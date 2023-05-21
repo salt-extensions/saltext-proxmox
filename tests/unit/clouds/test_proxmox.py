@@ -15,6 +15,7 @@ from tests.support.mock import call
 from tests.support.mock import MagicMock
 from tests.support.mock import patch
 
+
 @pytest.fixture
 def profile():
     return {
