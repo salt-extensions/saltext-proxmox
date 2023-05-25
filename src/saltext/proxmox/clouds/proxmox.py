@@ -98,8 +98,10 @@ def get_dependencies():
     return config.check_driver_dependencies(__virtualname__, deps)
 
 
+authenticated = False
 url = None
 port = None
+token = None
 ticket = None
 csrf = None
 verify_ssl = None
@@ -110,7 +112,7 @@ def _authenticate():
     """
     Retrieve CSRF and API tickets for the Proxmox API
     """
-    global url, port, ticket, csrf, verify_ssl
+    global authenticated, url, port, token, ticket, csrf, verify_ssl
     url = config.get_cloud_config_value(
         "url", get_configured_provider(), __opts__, search_global=False
     )
@@ -125,6 +127,10 @@ def _authenticate():
     passwd = config.get_cloud_config_value(
         "password", get_configured_provider(), __opts__, search_global=False
     )
+    api_token = config.get_cloud_config_value(
+        "token", get_configured_provider(), __opts__, search_global=False
+    )
+
     verify_ssl = config.get_cloud_config_value(
         "verify_ssl",
         get_configured_provider(),
@@ -133,22 +139,33 @@ def _authenticate():
         search_global=False,
     )
 
-    connect_data = {"username": username, "password": passwd}
-    full_url = "https://{}:{}/api2/json/access/ticket".format(url, port)
+    if passwd:
+        # Authentication is done via the URL resulting in a ticket.
+        log.debug("Using password auth for %s", username)
 
-    response = requests.post(full_url, verify=verify_ssl, data=connect_data)
-    response.raise_for_status()
-    returned_data = response.json()
+        full_url = "https://{}:{}/api2/json/access/ticket".format(url, port)
+        connect_data = {"username": username, "password": passwd}
 
-    ticket = {"PVEAuthCookie": returned_data["data"]["ticket"]}
-    csrf = str(returned_data["data"]["CSRFPreventionToken"])
+        response = requests.post(full_url, verify=verify_ssl, data=connect_data)
+        response.raise_for_status()
+        returned_data = response.json()
+
+        ticket = {"PVEAuthCookie": returned_data["data"]["ticket"]}
+        csrf = str(returned_data["data"]["CSRFPreventionToken"])
+    else:
+        # Token is provided to the API as a header.
+        log.debug("Using token auth for %s", username)
+
+        token = "PVEAPIToken={}!{}".format(username[0], api_token)
+
+    authenticated = True
 
 
 def query(conn_type, option, post_data=None):
     """
     Execute the HTTP request to the API
     """
-    if ticket is None or csrf is None or url is None:
+    if not authenticated:
         log.debug("Not authenticated yet, doing that now..")
         _authenticate()
 
@@ -158,12 +175,20 @@ def query(conn_type, option, post_data=None):
 
     httpheaders = {
         "Accept": "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "salt-cloud-proxmox",
     }
+    if conn_type != "get":
+        httpheaders["Content-Type"] = "application/x-www-form-urlencoded"
+        if token:
+            # Not using a ticket but a token
+            httpheaders["Authorization"] = token
+        else:
+            # When we're making changes using a ticket the API requires a CSRF
+            # header to guard against man in the middle attacks.
+            # So skip this for an HTTP GET.
+            httpheaders["CSRFPreventionToken"] = csrf
 
     if conn_type == "post":
-        httpheaders["CSRFPreventionToken"] = csrf
         response = requests.post(
             full_url,
             verify=verify_ssl,
@@ -172,7 +197,6 @@ def query(conn_type, option, post_data=None):
             headers=httpheaders,
         )
     elif conn_type == "put":
-        httpheaders["CSRFPreventionToken"] = csrf
         response = requests.put(
             full_url,
             verify=verify_ssl,
@@ -181,7 +205,6 @@ def query(conn_type, option, post_data=None):
             headers=httpheaders,
         )
     elif conn_type == "delete":
-        httpheaders["CSRFPreventionToken"] = csrf
         response = requests.delete(
             full_url,
             verify=verify_ssl,
@@ -190,7 +213,12 @@ def query(conn_type, option, post_data=None):
             headers=httpheaders,
         )
     elif conn_type == "get":
-        response = requests.get(full_url, verify=verify_ssl, cookies=ticket)
+        response = requests.get(
+            full_url,
+            verify=verify_ssl,
+            cookies=ticket,
+            headers=httpheaders,
+        )
 
     try:
         response.raise_for_status()
