@@ -306,6 +306,33 @@ def test_clone_id():
         )
 
 
+def test_avail_locations():
+    """
+    Test if the available locations make sense
+    """
+    with patch(
+        "saltext.proxmox.clouds.proxmox.query",
+        return_value=[
+            {
+                "node": "node1",
+                "status": "online",
+            },
+            {
+                "node": "node2",
+                "status": "offline",
+            },
+        ]
+    )
+    as mock_query:
+        result = proxmox.avail_locations()
+        assert result =={
+            "node1": {
+                    "node": "node1",
+                    "status": "online",
+            },
+        }
+
+
 def test_find_agent_ips():
     """
     Test find_agent_ip will return an IP
