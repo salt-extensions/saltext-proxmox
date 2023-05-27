@@ -321,10 +321,10 @@ def test_avail_locations():
                 "node": "node2",
                 "status": "offline",
             },
-        ]
+        ],
     ) as mock_query:
         result = proxmox.avail_locations()
-        assert result =={
+        assert result == {
             "node1": {
                 "node": "node1",
                 "status": "online",
