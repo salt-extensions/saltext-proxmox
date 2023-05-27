@@ -326,8 +326,8 @@ def test_avail_locations():
         result = proxmox.avail_locations()
         assert result =={
             "node1": {
-                    "node": "node1",
-                    "status": "online",
+                "node": "node1",
+                "status": "online",
             },
         }
 
