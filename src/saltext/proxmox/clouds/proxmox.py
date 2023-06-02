@@ -99,8 +99,6 @@ def get_dependencies():
 
 
 authenticated = False
-url = None
-port = None
 token = None
 ticket = None
 csrf = None
@@ -108,17 +106,26 @@ verify_ssl = None
 api = None
 
 
-def _authenticate():
+def _get_url():
     """
-    Retrieve CSRF and API tickets for the Proxmox API
+    Retrieve URL of the Proxmox API
     """
-    global authenticated, url, port, token, ticket, csrf, verify_ssl
     url = config.get_cloud_config_value(
         "url", get_configured_provider(), __opts__, search_global=False
     )
     port = config.get_cloud_config_value(
         "port", get_configured_provider(), __opts__, default=8006, search_global=False
     )
+    if not url:
+        raise SaltCloudExecutionFailure("Url missing from provider config")
+    return "https://{}:{}".format(url, port)
+
+
+def _authenticate():
+    """
+    Retrieve CSRF and API tickets for the Proxmox API
+    """
+    global authenticated, token, ticket, csrf, verify_ssl
     username = (
         config.get_cloud_config_value(
             "user", get_configured_provider(), __opts__, search_global=False
@@ -143,10 +150,10 @@ def _authenticate():
         # Authentication is done via the URL resulting in a ticket.
         log.debug("Using password auth for %s", username)
 
-        full_url = "https://{}:{}/api2/json/access/ticket".format(url, port)
+        url = "{}/api2/json/access/ticket".format(_get_url())
         connect_data = {"username": username, "password": passwd}
 
-        response = requests.post(full_url, verify=verify_ssl, data=connect_data)
+        response = requests.post(url, verify=verify_ssl, data=connect_data)
         response.raise_for_status()
         returned_data = response.json()
 
@@ -169,9 +176,9 @@ def query(conn_type, option, post_data=None):
         log.debug("Not authenticated yet, doing that now..")
         _authenticate()
 
-    full_url = "https://{}:{}/api2/json/{}".format(url, port, option)
+    url = "{}/api2/json/{}".format(_get_url(), option)
 
-    log.debug("%s: %s (%s)", conn_type, full_url, post_data)
+    log.debug("%s: %s (%s)", conn_type, url, post_data)
 
     httpheaders = {
         "Accept": "application/json",
@@ -190,7 +197,7 @@ def query(conn_type, option, post_data=None):
 
     if conn_type == "post":
         response = requests.post(
-            full_url,
+            url,
             verify=verify_ssl,
             data=post_data,
             cookies=ticket,
@@ -198,7 +205,7 @@ def query(conn_type, option, post_data=None):
         )
     elif conn_type == "put":
         response = requests.put(
-            full_url,
+            url,
             verify=verify_ssl,
             data=post_data,
             cookies=ticket,
@@ -206,7 +213,7 @@ def query(conn_type, option, post_data=None):
         )
     elif conn_type == "delete":
         response = requests.delete(
-            full_url,
+            url,
             verify=verify_ssl,
             data=post_data,
             cookies=ticket,
@@ -214,7 +221,7 @@ def query(conn_type, option, post_data=None):
         )
     elif conn_type == "get":
         response = requests.get(
-            full_url,
+            url,
             verify=verify_ssl,
             cookies=ticket,
             headers=httpheaders,
@@ -224,7 +231,7 @@ def query(conn_type, option, post_data=None):
         response.raise_for_status()
     except requests.exceptions.RequestException:
         # Log the details of the response.
-        log.error("Error in %s query to %s:\n%s", conn_type, full_url, response.text)
+        log.error("Error in %s query to %s:\n%s", conn_type, url, response.text)
         raise
 
     try:
@@ -875,8 +882,8 @@ def _import_api():
     Load this json content into global variable "api"
     """
     global api
-    full_url = "https://{}:{}/pve-docs/api-viewer/apidoc.js".format(url, port)
-    returned_data = requests.get(full_url, verify=verify_ssl)
+    url = "{}/pve-docs/api-viewer/apidoc.js".format(_get_url())
+    returned_data = requests.get(url, verify=verify_ssl)
 
     re_filter = re.compile(" (?:pveapi|apiSchema) = (.*)^;", re.DOTALL | re.MULTILINE)
     api_json = re_filter.findall(returned_data.text)[0]
