@@ -693,10 +693,11 @@ def create(vm_):
                 vm_["ip_address"] = str(ip_address)
 
     try:
-        if 'vmid' in vm_:
-            newid = vm_['vmid']
+        if "vmid" in vm_:
+            newid = vm_["vmid"]
         else:
             newid = _get_next_vmid()
+
         data = create_node(vm_, newid)
     except Exception as exc:  # pylint: disable=broad-except
         msg = str(exc)
