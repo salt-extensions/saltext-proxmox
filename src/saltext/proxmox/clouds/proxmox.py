@@ -698,7 +698,6 @@ def create(vm_):
     name = vm_["name"]  # hostname which we know
     vmid = data["vmid"]  # vmid which we have received
     host = data["node"]  # host which we have received
-    nodeType = data["technology"]  # VM tech (Qemu / OpenVZ)
 
     agent_get_ip = vm_.get("agent_get_ip", False)
 
