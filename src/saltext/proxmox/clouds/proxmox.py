@@ -277,22 +277,6 @@ def _get_next_vmid():
     return int(query("get", "cluster/nextid"))
 
 
-def _check_ip_available(ip_addr):
-    """
-    Proxmox VMs refuse to start when the IP is already being used.
-    This function can be used to prevent VMs being created with duplicate
-    IP's or to generate a warning.
-    """
-    for vm_name, vm_details in get_resources_vms(includeConfig=True).items():
-        vm_config = vm_details["config"]
-        if ip_addr in vm_config["ip_address"] or vm_config["ip_address"] == ip_addr:
-            log.debug('IP "%s" is already defined', ip_addr)
-            return False
-
-    log.debug("IP '%s' is available to be defined", ip_addr)
-    return True
-
-
 def _parse_proxmox_upid(node, vm_=None):
     """
     Upon requesting a task that runs for a longer period of time a UPID is given.
