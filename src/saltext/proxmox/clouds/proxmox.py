@@ -7,7 +7,7 @@ Proxmox Cloud Module
 .. versionchanged:: 3006.0
 
 The Proxmox cloud module is used to control access to cloud providers using
-the Proxmox system (KVM / OpenVZ / LXC).
+the Proxmox system (KVM / LXC).
 
 Set up the cloud configuration at ``/etc/salt/cloud.providers`` or
  ``/etc/salt/cloud.providers.d/proxmox.conf``:
@@ -359,7 +359,7 @@ def get_resources_vms(call=None, resFilter=None, includeConfig=True):
         ret = {}
         badResource = False
         for resource in resources:
-            if "type" in resource and resource["type"] in ["openvz", "qemu", "lxc"]:
+            if "type" in resource and resource["type"] in ["qemu", "lxc"]:
                 try:
                     name = resource["name"]
                 except KeyError:
@@ -910,11 +910,11 @@ def create_node(vm_, newid):
     newnode = {}
 
     if "technology" not in vm_:
-        vm_["technology"] = "openvz"  # default virt tech if none is given
+        vm_["technology"] = "lxc"  # default virt tech if none is given
 
-    if vm_["technology"] not in ["qemu", "openvz", "lxc"]:
+    if vm_["technology"] not in ["qemu", "lxc"]:
         # Wrong VM type given
-        log.error("Wrong VM type. Valid options are: qemu, openvz (proxmox3) or lxc" " (proxmox4)")
+        log.error("Wrong VM type. Valid options are: qemu or lxc")
         raise SaltCloudExecutionFailure
 
     if "host" not in vm_:
@@ -928,7 +928,7 @@ def create_node(vm_, newid):
         log.error("No host given to create this VM on")
         raise SaltCloudExecutionFailure
 
-    # Required by both OpenVZ and Qemu (KVM)
+    # Required parameters
     vmhost = vm_["host"]
     newnode["vmid"] = newid
 
@@ -936,26 +936,7 @@ def create_node(vm_, newid):
         if prop in vm_:  # if the property is set, use it for the VM request
             newnode[prop] = vm_[prop]
 
-    if vm_["technology"] == "openvz":
-        # OpenVZ related settings, using non-default names:
-        newnode["hostname"] = vm_["name"]
-        newnode["ostemplate"] = vm_["image"]
-
-        # optional VZ settings
-        for prop in (
-            "cpus",
-            "disk",
-            "ip_address",
-            "nameserver",
-            "password",
-            "swap",
-            "poolid",
-            "storage",
-        ):
-            if prop in vm_:  # if the property is set, use it for the VM request
-                newnode[prop] = vm_[prop]
-
-    elif vm_["technology"] == "lxc":
+    if vm_["technology"] == "lxc":
         # LXC related settings, using non-default names:
         newnode["hostname"] = vm_["name"]
         newnode["ostemplate"] = vm_["image"]
@@ -1072,7 +1053,7 @@ def show_instance(name, call=None):
     return nodes[name]
 
 
-def get_vmconfig(vmid, node=None, node_type="openvz"):
+def get_vmconfig(vmid, node=None, node_type="lxc"):
     """
     Get VM configuration
     """
