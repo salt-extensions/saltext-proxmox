@@ -25,7 +25,6 @@ Set up the cloud configuration at ``/etc/salt/cloud.providers`` or
 
 :maintainer: Frank Klaassen <frank@cloudright.nl>
 :depends: requests >= 2.2.1
-:depends: IPy >= 0.81
 """
 import logging
 import pprint
@@ -33,6 +32,8 @@ import re
 import socket
 import time
 import urllib
+from ipaddress import ip_address
+from ipaddress import ip_network
 
 import salt.config as config
 import salt.utils.cloud
@@ -47,13 +48,6 @@ try:
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
-
-try:
-    from IPy import IP
-
-    HAS_IPY = True
-except ImportError:
-    HAS_IPY = False
 
 # Get logging started
 log = logging.getLogger(__name__)
@@ -94,7 +88,7 @@ def get_dependencies():
     """
     Warn if dependencies aren't met.
     """
-    deps = {"requests": HAS_REQUESTS, "IPy": HAS_IPY}
+    deps = {"requests": HAS_REQUESTS}
     return config.check_driver_dependencies(__virtualname__, deps)
 
 
@@ -515,7 +509,7 @@ def list_nodes(call=None):
         if "ip_address" in vm_details["config"] and vm_details["config"]["ip_address"] != "-":
             ips = vm_details["config"]["ip_address"].split(" ")
             for ip_ in ips:
-                if IP(ip_).iptype() == "PRIVATE":
+                if ip_address(ip_).is_private:
                     private_ips.append(str(ip_))
                 else:
                     public_ips.append(str(ip_))
@@ -822,7 +816,6 @@ def ignore_cidr(vm_, ip):
     """
     Return True if we are to ignore the specified IP.
     """
-    from ipaddress import ip_address, ip_network
 
     cidrs = config.get_cloud_config_value(
         "ignore_cidr", vm_, __opts__, default=[], search_global=False
