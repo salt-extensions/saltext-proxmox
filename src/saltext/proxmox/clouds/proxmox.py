@@ -460,7 +460,7 @@ def avail_locations(call=None):
     return ret
 
 
-def avail_images(kwargs=None, call=None):
+def avail_images(call=None, kwargs=None):
     """
     Return a list of the images that are on the provider
 
