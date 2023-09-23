@@ -306,6 +306,26 @@ def test_clone_id():
         )
 
 
+def test_avail_images():
+    """
+    Test avail_images with different values for location parameter
+    """
+    with patch("saltext.proxmox.clouds.proxmox.avail_locations", return_value={"node1": {}}), patch(
+        "saltext.proxmox.clouds.proxmox.query", return_value=[]
+    ) as mock_query:
+
+        # CASE 1: location not set should default to "local"
+        proxmox.avail_images()
+        mock_query.assert_called_with("get", "nodes/{}/storage/{}/content".format("node1", "local"))
+
+        # CASE 2: location set should query location
+        kwargs = {"location": "other_storage"}
+        proxmox.avail_images(kwargs=kwargs)
+        mock_query.assert_called_with(
+            "get", "nodes/{}/storage/{}/content".format("node1", kwargs["location"])
+        )
+
+
 def test_avail_locations():
     """
     Test if the available locations make sense
