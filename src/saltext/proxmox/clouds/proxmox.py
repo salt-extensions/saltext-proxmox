@@ -1283,7 +1283,7 @@ def stop(name, vmid=None, call=None):
 
         log.debug('Waiting for state "stopped" for vm %s on %s', vmid, name)
         if not wait_for_state(vmid, "stopped"):
-            return {"Error": "Unable to start {}, command timed out".format(name)}
+            return {"Error": "Unable to stop {}, command timed out".format(name)}
 
     return {"Stopped": "{} was stopped.".format(name)}
 
@@ -1311,6 +1311,6 @@ def shutdown(name=None, vmid=None, call=None):
 
     log.debug('Waiting for state "stopped" for vm %s on %s', vmid, name)
     if not wait_for_state(vmid, "stopped"):
-        return {"Error": "Unable to start {}, command timed out".format(name)}
+        return {"Error": "Unable to shutdown {}, command timed out".format(name)}
 
     return {"Shutdown": "{} was shutdown.".format(name)}
