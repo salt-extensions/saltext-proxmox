@@ -1279,12 +1279,11 @@ def stop(name, vmid=None, call=None):
 
     if vmid is None:
         vmobj = _get_vm_by_name(name)
-        vmid = vmobj['vmid']
+        vmid = vmobj["vmid"]
 
-        # Wait until the VM has fully started
         log.debug('Waiting for state "stopped" for vm %s on %s', vmid, name)
-        if not wait_for_state(vmid, 'stopped'):
-            return {'Error': 'Unable to start {0}, command timed out'.format(name)}
+        if not wait_for_state(vmid, "stopped"):
+            return {"Error": "Unable to start {}, command timed out".format(name)}
 
     return {"Stopped": "{} was stopped.".format(name)}
 
@@ -1308,11 +1307,10 @@ def shutdown(name=None, vmid=None, call=None):
 
     if vmid is None:
         vmobj = _get_vm_by_name(name)
-        vmid = vmobj['vmid']
+        vmid = vmobj["vmid"]
 
-    # Wait until the VM has fully started
     log.debug('Waiting for state "stopped" for vm %s on %s', vmid, name)
-    if not wait_for_state(vmid, 'stopped'):
-        return {'Error': 'Unable to start {0}, command timed out'.format(name)}
+    if not wait_for_state(vmid, "stopped"):
+        return {"Error": "Unable to start {}, command timed out".format(name)}
 
     return {"Shutdown": "{} was shutdown.".format(name)}
