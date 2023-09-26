@@ -875,7 +875,7 @@ def _import_api():
     api = salt.utils.json.loads(api_json)
 
 
-def _get_properties(path="", method="GET", forced_params=None):
+def _get_properties(path="", method="GET"):
     """
     Return the parameter list from api for defined path and HTTP method
     """
@@ -886,7 +886,7 @@ def _get_properties(path="", method="GET", forced_params=None):
     path_levels = [level for level in path.split("/") if level != ""]
     search_path = ""
     props = []
-    parameters = set([] if forced_params is None else forced_params)
+    parameters = set()
     # Browse all path elements but last
     for elem in path_levels[:-1]:
         search_path += "/" + elem
@@ -950,22 +950,7 @@ def create_node(vm_, newid):
         newnode["hostname"] = vm_["name"]
         newnode["ostemplate"] = vm_["image"]
 
-        static_props = (
-            "cpuunits",
-            "cpulimit",
-            "rootfs",
-            "cores",
-            "description",
-            "memory",
-            "onboot",
-            "net0",
-            "password",
-            "nameserver",
-            "swap",
-            "storage",
-            "rootfs",
-        )
-        for prop in _get_properties("/nodes/{node}/lxc", "POST", static_props):
+        for prop in _get_properties("/nodes/{node}/lxc", "POST"):
             if prop in vm_:  # if the property is set, use it for the VM request
                 newnode[prop] = vm_[prop]
 
@@ -989,21 +974,8 @@ def create_node(vm_, newid):
                 newnode["net0"] = newnode["net0"] + ",gw=" + vm_["gw"]
 
     elif vm_["technology"] == "qemu":
-        # optional Qemu settings
-        static_props = (
-            "acpi",
-            "cores",
-            "cpu",
-            "pool",
-            "storage",
-            "sata0",
-            "ostype",
-            "ide2",
-            "net0",
-        )
-        for prop in _get_properties("/nodes/{node}/qemu", "POST", static_props):
+        for prop in _get_properties("/nodes/{node}/qemu", "POST"):
             if prop in vm_:  # if the property is set, use it for the VM request
-                # If specified, vmid will override newid.
                 newnode[prop] = vm_[prop]
 
     # The node is ready. Lets request it to be added
