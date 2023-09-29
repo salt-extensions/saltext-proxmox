@@ -607,6 +607,19 @@ def _reconfigure_clone(vm_, vmid):
             )
 
 
+def _use_dns(vm_):
+    """
+    Configure ip_address by resolving the name with DNS
+    """
+    from socket import gaierror, gethostbyname
+
+    try:
+        vm_["ip_address"] = gethostbyname(str(vm_["name"]))
+    except gaierror:
+        log.error("Resolving of %s failed", vm_["name"])
+        raise SaltCloudExecutionFailure
+
+
 def create(vm_):
     """
     Create a single VM from a data dict
@@ -647,18 +660,6 @@ def create(vm_):
     )
 
     log.info("Creating Cloud VM %s", vm_["name"])
-
-    if "use_dns" in vm_ and "ip_address" not in vm_:
-        use_dns = vm_["use_dns"]
-        if use_dns:
-            from socket import gaierror, gethostbyname
-
-            try:
-                ip_address = gethostbyname(str(vm_["name"]))
-            except gaierror:
-                log.debug("Resolving of %s failed", vm_["name"])
-            else:
-                vm_["ip_address"] = str(ip_address)
 
     try:
         data = create_node(vm_)
@@ -908,6 +909,8 @@ def create_node(vm_):
     if "vmid" not in vm_:
         vm_["vmid"] = _get_next_vmid()
 
+    if vm_.get("use_dns", False) and "ip_address" not in vm_:
+        _use_dns(vm_)
 
     if vm_["technology"] == "lxc":
         # LXC related settings, using non-default names:
