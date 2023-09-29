@@ -894,22 +894,13 @@ def create_node(vm_, newid):
     """
     newnode = {}
 
-    if "technology" not in vm_:
-        vm_["technology"] = "lxc"  # default virt tech if none is given
-
-    if vm_["technology"] not in ["qemu", "lxc"]:
-        # Wrong VM type given
-        log.error("Wrong VM type. Valid options are: qemu or lxc")
+    if vm_.get("technology", "lxc") not in ["qemu", "lxc"]:
+        # No or wrong VM type given
+        log.error("No or wrong VM type. Valid options are: qemu or lxc")
         raise SaltCloudExecutionFailure
 
-    if "host" not in vm_:
-        # Use globally configured/default location
-        vm_["host"] = config.get_cloud_config_value(
-            "default_host", get_configured_provider(), __opts__, search_global=False
-        )
-
-    if vm_["host"] is None:
-        # No location given for the profile
+    if vm_.get("host") is None:
+        # No proxmox node given
         log.error("No host given to create this VM on")
         raise SaltCloudExecutionFailure
 
