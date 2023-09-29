@@ -662,7 +662,7 @@ def create(vm_):
     log.info("Creating Cloud VM %s", vm_["name"])
 
     try:
-        data = create_node(vm_)
+        data = _create_node(vm_)
     except Exception as exc:  # pylint: disable=broad-except
         msg = str(exc)
         if isinstance(exc, requests.exceptions.RequestException) and exc.response is not None:
@@ -699,7 +699,7 @@ def create(vm_):
         log.debug("Using IP address %s", ip_address)
 
     # wait until the vm has been created so we can start it
-    if not wait_for_created(data["upid"], timeout=300):
+    if not _wait_for_created(data["upid"], timeout=300):
         return {"Error": "Unable to create {}, command timed out".format(name)}
 
     if vm_.get("clone") is True:
@@ -756,7 +756,7 @@ def create(vm_):
     return ret
 
 
-def preferred_ip(vm_, ips):
+def _preferred_ip(vm_, ips):
     """
     Return either an 'ipv4' (default) or 'ipv6' address depending on 'protocol' option.
     The list of 'ipv4' IPs is filtered by ignore_cidr() to remove any unreachable private addresses.
@@ -769,7 +769,7 @@ def preferred_ip(vm_, ips):
     if proto == "ipv6":
         family = socket.AF_INET6
     for ip in ips:
-        ignore_ip = ignore_cidr(vm_, ip)
+        ignore_ip = _ignore_cidr(vm_, ip)
         if ignore_ip:
             continue
         try:
@@ -780,7 +780,7 @@ def preferred_ip(vm_, ips):
     return False
 
 
-def ignore_cidr(vm_, ip):
+def _ignore_cidr(vm_, ip):
     """
     Return True if we are to ignore the specified IP.
     """
@@ -831,7 +831,7 @@ def _find_agent_ip(vm_, vmid):
                 ips.append(str(ip_addr))
 
     if len(ips) > 0:
-        return preferred_ip(vm_, ips)
+        return _preferred_ip(vm_, ips)
 
     raise SaltCloudExecutionFailure
 
@@ -917,7 +917,7 @@ def _clone_vm(vm_):
     return node
 
 
-def create_node(vm_):
+def _create_node(vm_):
     """
     Build and submit the requestdata to create a new node
     """
@@ -1008,7 +1008,7 @@ def show_instance(name, call=None):
     return nodes[name]
 
 
-def get_vmconfig(vmid, node=None, node_type="lxc"):
+def _get_vmconfig(vmid, node=None, node_type="lxc"):
     """
     Get VM configuration
     """
@@ -1025,7 +1025,7 @@ def get_vmconfig(vmid, node=None, node_type="lxc"):
     return data
 
 
-def wait_for_created(upid, timeout=300):
+def _wait_for_created(upid, timeout=300):
     """
     Wait until a the vm has been created successfully
     """
@@ -1046,12 +1046,12 @@ def wait_for_created(upid, timeout=300):
         info = _lookup_proxmox_task(upid)
 
 
-def wait_for_state(vmid, state, timeout=300):
+def _wait_for_state(vmid, state, timeout=300):
     """
     Wait until a specific state has been reached on a node
     """
     start_time = time.time()
-    node = get_vm_status(vmid=vmid)
+    node = _get_vm_status(vmid=vmid)
     if not node:
         log.error("wait_for_state: No VM retrieved based on given criteria.")
         raise SaltCloudExecutionFailure
@@ -1064,7 +1064,7 @@ def wait_for_state(vmid, state, timeout=300):
         if time.time() - start_time > timeout:
             log.debug("Timeout reached while waiting for %s to become %s", node["name"], state)
             return False
-        node = get_vm_status(vmid=vmid)
+        node = _get_vm_status(vmid=vmid)
         log.debug('State for %s is: "%s" instead of "%s"', node["name"], node["status"], state)
 
 
@@ -1095,11 +1095,11 @@ def destroy(name, call=None):
     vmobj = _get_vm_by_name(name)
     if vmobj is not None:
         # stop the vm
-        if get_vm_status(vmid=vmobj["vmid"])["status"] != "stopped":
+        if _get_vm_status(vmid=vmobj["vmid"])["status"] != "stopped":
             stop(name, vmobj["vmid"], "action")
 
         # wait until stopped
-        if not wait_for_state(vmobj["vmid"], "stopped"):
+        if not _wait_for_state(vmobj["vmid"], "stopped"):
             return {"Error": "Unable to stop {}, command timed out".format(name)}
 
         # required to wait a bit here, otherwise the VM is sometimes
@@ -1123,7 +1123,7 @@ def destroy(name, call=None):
         return {"Destroyed": "{} was destroyed.".format(name)}
 
 
-def set_vm_status(status, name=None, vmid=None):
+def _set_vm_status(status, name=None, vmid=None):
     """
     Convenience function for setting VM status
     """
@@ -1155,7 +1155,7 @@ def set_vm_status(status, name=None, vmid=None):
     return False
 
 
-def get_vm_status(vmid=None, name=None):
+def _get_vm_status(vmid=None, name=None):
     """
     Get the status for a VM, either via the ID or the hostname
     """
@@ -1197,12 +1197,12 @@ def start(name, vmid=None, call=None):
         raise SaltCloudSystemExit("The start action must be called with -a or --action.")
 
     log.debug("Start: %s (%s) = Start", name, vmid)
-    if not set_vm_status("start", name, vmid=vmid):
+    if not _set_vm_status("start", name, vmid=vmid):
         log.error("Unable to bring VM %s (%s) up..", name, vmid)
         raise SaltCloudExecutionFailure
 
     log.debug('Waiting for state "running" for vm %s on %s', vmid, name)
-    if not wait_for_state(vmid, "running"):
+    if not _wait_for_state(vmid, "running"):
         return {"Error": "Unable to start {}, command timed out".format(name)}
 
     return {"Started": "{} was started.".format(name)}
@@ -1221,7 +1221,7 @@ def stop(name, vmid=None, call=None):
     if call != "action":
         raise SaltCloudSystemExit("The stop action must be called with -a or --action.")
 
-    if not set_vm_status("stop", name, vmid=vmid):
+    if not _set_vm_status("stop", name, vmid=vmid):
         log.error("Unable to bring VM %s (%s) down..", name, vmid)
         raise SaltCloudExecutionFailure
 
@@ -1243,7 +1243,7 @@ def shutdown(name=None, vmid=None, call=None):
     if call != "action":
         raise SaltCloudSystemExit("The shutdown action must be called with -a or --action.")
 
-    if not set_vm_status("shutdown", name, vmid=vmid):
+    if not _set_vm_status("shutdown", name, vmid=vmid):
         log.error("Unable to shut VM %s (%s) down..", name, vmid)
         raise SaltCloudExecutionFailure
 
