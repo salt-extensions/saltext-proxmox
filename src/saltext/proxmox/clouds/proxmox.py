@@ -661,8 +661,7 @@ def create(vm_):
                 vm_["ip_address"] = str(ip_address)
 
     try:
-        newid = _get_next_vmid()
-        data = create_node(vm_, newid)
+        data = create_node(vm_)
     except Exception as exc:  # pylint: disable=broad-except
         msg = str(exc)
         if isinstance(exc, requests.exceptions.RequestException) and exc.response is not None:
@@ -888,7 +887,7 @@ def _get_properties(path="", method="GET"):
     return parameters
 
 
-def create_node(vm_, newid):
+def create_node(vm_):
     """
     Build and submit the requestdata to create a new node
     """
@@ -906,7 +905,8 @@ def create_node(vm_, newid):
 
     # Required parameters
     vmhost = vm_["host"]
-    newnode["vmid"] = newid
+    if "vmid" not in vm_:
+        vm_["vmid"] = _get_next_vmid()
 
     for prop in "cpuunits", "description", "memory", "onboot":
         if prop in vm_:  # if the property is set, use it for the VM request
