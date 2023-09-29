@@ -160,7 +160,7 @@ def _authenticate():
     authenticated = True
 
 
-def query(conn_type, option, post_data=None):
+def _query(conn_type, option, post_data=None):
     """
     Execute the HTTP request to the API
     """
@@ -266,7 +266,7 @@ def _get_next_vmid():
     Proxmox allows the use of alternative ids instead of autoincrementing.
     Because of that its required to query what the first available ID is.
     """
-    return int(query("get", "cluster/nextid"))
+    return int(_query("get", "cluster/nextid"))
 
 
 def _parse_proxmox_upid(node, vm_=None):
@@ -302,7 +302,7 @@ def _lookup_proxmox_task(upid):
     This can be used to verify whether a task has completed.
     """
     log.debug("Getting creation status for upid: %s", upid)
-    tasks = query("get", "cluster/tasks")
+    tasks = _query("get", "cluster/tasks")
 
     if tasks:
         for task in tasks:
@@ -409,7 +409,7 @@ def avail_locations(call=None):
         )
 
     # could also use the get_resources_nodes but speed is ~the same
-    nodes = query("get", "nodes")
+    nodes = _query("get", "nodes")
 
     ret = {}
     for node in nodes:
@@ -446,7 +446,7 @@ def avail_images(call=None, kwargs=None):
 
     ret = {}
     for host_name, host_details in avail_locations().items():
-        for item in query("get", "nodes/{}/storage/{}/content".format(host_name, location)):
+        for item in _query("get", "nodes/{}/storage/{}/content".format(host_name, location)):
             ret[item["volid"]] = item
     return ret
 
@@ -580,7 +580,7 @@ def _reconfigure_clone(vm_, vmid):
             # are left alone. An example of why this is necessary is because the MAC address is set
             # in here and generally you don't want to alter or have to know the MAC address of the new
             # instance, but you may want to set the VLAN bridge
-            data = query("get", "nodes/{}/qemu/{}/config".format(vm_["host"], vmid))
+            data = _query("get", "nodes/{}/qemu/{}/config".format(vm_["host"], vmid))
 
             # Generate a dictionary of settings from the existing string
             new_setting = {}
@@ -600,7 +600,7 @@ def _reconfigure_clone(vm_, vmid):
             postParams = {setting: vm_[setting]}
 
         if postParams:
-            query(
+            _query(
                 "post",
                 "nodes/{}/qemu/{}/config".format(vm_["host"], vmid),
                 postParams,
@@ -812,7 +812,7 @@ def _find_agent_ip(vm_, vmid):
     ips = []
 
     endpoint = "nodes/{}/qemu/{}/agent/network-get-interfaces".format(vm_["host"], vmid)
-    interfaces = query("get", endpoint)
+    interfaces = _query("get", endpoint)
 
     # If we get a result from the agent, parse it
     for interface in interfaces["result"]:
@@ -987,7 +987,7 @@ def create_node(vm_):
     if vm_.get("clone", False) and vm_["technology"] == "qemu":
         node = _clone_vm(vm_)
     else:
-        node = query("post", "nodes/{}/{}".format(vmhost, vm_["technology"]), newnode)
+        node = _query("post", "nodes/{}/{}".format(vm_["host"], vm_["technology"]), newnode)
     result = _parse_proxmox_upid(node, vm_)
 
     # When cloning, the upid contains the clone_from vmid instead of the new vmid
@@ -1015,12 +1015,12 @@ def get_vmconfig(vmid, node=None, node_type="lxc"):
     if node is None:
         # We need to figure out which node this VM is on.
         for host_name, host_details in avail_locations().items():
-            for item in query("get", "nodes/{}/{}".format(host_name, node_type)):
+            for item in _query("get", "nodes/{}/{}".format(host_name, node_type)):
                 if item["vmid"] == vmid:
                     node = host_name
 
     # If we reached this point, we have all the information we need
-    data = query("get", "nodes/{}/{}/{}/config".format(node, node_type, vmid))
+    data = _query("get", "nodes/{}/{}/{}/config".format(node, node_type, vmid))
 
     return data
 
@@ -1106,7 +1106,7 @@ def destroy(name, call=None):
         # still locked and destroy fails.
         time.sleep(3)
 
-        query("delete", "nodes/{}/{}".format(vmobj["node"], vmobj["id"]))
+        _query("delete", "nodes/{}/{}".format(vmobj["node"], vmobj["id"]))
         __utils__["cloud.fire_event"](
             "event",
             "destroyed instance",
@@ -1141,7 +1141,7 @@ def set_vm_status(status, name=None, vmid=None):
         raise SaltCloudExecutionTimeout
 
     log.debug("VM_STATUS: Has desired info (%s). Setting status..", vmobj)
-    data = query(
+    data = _query(
         "post",
         "nodes/{}/{}/{}/status/{}".format(vmobj["node"], vmobj["type"], vmobj["vmid"], status),
     )
@@ -1173,7 +1173,7 @@ def get_vm_status(vmid=None, name=None):
 
     if vmobj is not None and "node" in vmobj:
         log.debug("VM_STATUS: Has desired info. Retrieving.. (%s)", vmobj["name"])
-        data = query(
+        data = _query(
             "get",
             "nodes/{}/{}/{}/status/current".format(vmobj["node"], vmobj["type"], vmobj["vmid"]),
         )
