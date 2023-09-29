@@ -324,13 +324,12 @@ def get_resources_nodes(call=None, resFilter=None):
         salt-cloud -f get_resources_nodes my-proxmox-config
     """
     log.debug("Getting resource: nodes.. (filter: %s)", resFilter)
-    resources = query("get", "cluster/resources")
+    resources = _query("get", "cluster/resources?node")
 
     ret = {}
     for resource in resources:
-        if "type" in resource and resource["type"] == "node":
-            name = resource["node"]
-            ret[name] = resource
+        name = resource["node"]
+        ret[name] = resource
 
     if resFilter is not None:
         log.debug("Filter given: %s, returning requested resource: nodes", resFilter)
