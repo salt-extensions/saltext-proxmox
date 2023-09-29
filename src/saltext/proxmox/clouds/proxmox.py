@@ -349,43 +349,30 @@ def get_resources_vms(call=None, resFilter=None, includeConfig=True):
 
         salt-cloud -f get_resources_vms my-proxmox-config
     """
-    timeoutTime = time.time() + 60
-    while True:
-        log.debug("Getting resource: vms.. (filter: %s)", resFilter)
-        resources = query("get", "cluster/resources")
-        ret = {}
-        badResource = False
-        for resource in resources:
-            if "type" in resource and resource["type"] in ["qemu", "lxc"]:
-                try:
-                    name = resource["name"]
-                except KeyError:
-                    badResource = True
-                    log.debug("No name in VM resource %s", repr(resource))
-                    break
+    log.debug("Getting resource: vms.. (filter: %s)", resFilter)
+    resources = _query("get", "cluster/resources?type=vm")
+    ret = {}
+    for resource in resources:
+        if resource["type"] in ["qemu", "lxc"]:
+            try:
+                name = resource["name"]
+            except KeyError:
+                log.warning("No name in VM resource %s", repr(resource))
+                continue
 
-                ret[name] = resource
+            ret[name] = resource
 
-                if includeConfig:
-                    # Requested to include the detailed configuration of a VM
-                    ret[name]["config"] = get_vmconfig(
-                        ret[name]["vmid"], ret[name]["node"], ret[name]["type"]
-                    )
-
-        if time.time() > timeoutTime:
-            raise SaltCloudExecutionTimeout("FAILED to get the proxmox resources vms")
-
-        # Carry on if there wasn't a bad resource return from Proxmox
-        if not badResource:
-            break
-
-        time.sleep(0.5)
+            if includeConfig:
+                # Requested to include the detailed configuration of a VM
+                ret[name]["config"] = _get_vmconfig(
+                    ret[name]["vmid"], ret[name]["node"], ret[name]["type"]
+                )
 
     if resFilter is not None:
-        log.debug("Filter given: %s, returning requested resource: nodes", resFilter)
+        log.debug("Filter given: %s, returning requested resource: vms", resFilter)
         return ret[resFilter]
 
-    log.debug("Filter not given: %s, returning all resource: nodes", ret)
+    log.debug("Filter not given: %s, returning all resource: vms", ret)
     return ret
 
 
