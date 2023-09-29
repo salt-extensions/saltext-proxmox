@@ -888,6 +888,35 @@ def _get_properties(path="", method="GET"):
     return parameters
 
 
+def _clone_vm(vm_):
+    vmhost = vm_["host"]
+
+    postParams = {}
+    postParams["newid"] = vm_["vmid"]
+
+    if "pool" in vm_:
+        postParams["pool"] = vm_["pool"]
+
+    for prop in "description", "format", "full", "name":
+        if "clone_" + prop in vm_:  # if the property is set, use it for the VM request
+            postParams[prop] = vm_["clone_" + prop]
+
+    try:
+        int(vm_["clone_from"])
+    except ValueError:
+        if ":" in vm_["clone_from"]:
+            vmhost = vm_["clone_from"].split(":")[0]
+            vm_["clone_from"] = vm_["clone_from"].split(":")[1]
+
+    node = _query(
+        "post",
+        "nodes/{}/qemu/{}/clone".format(vmhost, vm_["clone_from"]),
+        postParams,
+    )
+
+    return node
+
+
 def create_node(vm_):
     """
     Build and submit the requestdata to create a new node
@@ -904,8 +933,6 @@ def create_node(vm_):
         log.error("No host given to create this VM on")
         raise SaltCloudExecutionFailure
 
-    # Required parameters
-    vmhost = vm_["host"]
     if "vmid" not in vm_:
         vm_["vmid"] = _get_next_vmid()
 
@@ -957,28 +984,8 @@ def create_node(vm_):
     )
 
     log.debug("Preparing to generate a node using these parameters: %s ", newnode)
-    if "clone" in vm_ and vm_["clone"] is True and vm_["technology"] == "qemu":
-        postParams = {}
-        postParams["newid"] = newnode["vmid"]
-        if "pool" in vm_:
-            postParams["pool"] = vm_["pool"]
-
-        for prop in "description", "format", "full", "name":
-            if "clone_" + prop in vm_:  # if the property is set, use it for the VM request
-                postParams[prop] = vm_["clone_" + prop]
-
-        try:
-            int(vm_["clone_from"])
-        except ValueError:
-            if ":" in vm_["clone_from"]:
-                vmhost = vm_["clone_from"].split(":")[0]
-                vm_["clone_from"] = vm_["clone_from"].split(":")[1]
-
-        node = query(
-            "post",
-            "nodes/{}/qemu/{}/clone".format(vmhost, vm_["clone_from"]),
-            postParams,
-        )
+    if vm_.get("clone", False) and vm_["technology"] == "qemu":
+        node = _clone_vm(vm_)
     else:
         node = query("post", "nodes/{}/{}".format(vmhost, vm_["technology"]), newnode)
     result = _parse_proxmox_upid(node, vm_)
