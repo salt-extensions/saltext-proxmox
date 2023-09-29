@@ -908,9 +908,6 @@ def create_node(vm_):
     if "vmid" not in vm_:
         vm_["vmid"] = _get_next_vmid()
 
-    for prop in "cpuunits", "description", "memory", "onboot":
-        if prop in vm_:  # if the property is set, use it for the VM request
-            newnode[prop] = vm_[prop]
 
     if vm_["technology"] == "lxc":
         # LXC related settings, using non-default names:
