@@ -442,10 +442,7 @@ def avail_images(call=None, kwargs=None):
     if not isinstance(kwargs, dict):
         kwargs = {}
 
-    if "location" in kwargs:
-        location = kwargs["location"]
-    else:
-        location = "local"
+    location = kwargs.get("location", "local")
 
     ret = {}
     for host_name, host_details in avail_locations().items():
