@@ -710,11 +710,6 @@ def create(vm_):
         log.error("Node %s (%s) failed to start!", name, vmid)
         raise SaltCloudExecutionFailure
 
-    # Wait until the VM has fully started
-    log.debug('Waiting for state "running" for vm %s on %s', vmid, host)
-    if not wait_for_state(vmid, "running"):
-        return {"Error": "Unable to start {}, command timed out".format(name)}
-
     if agent_get_ip is True:
         try:
             ip_address = salt.utils.cloud.wait_for_fun(_find_agent_ip, vm_=vm_, vmid=vmid)
@@ -1208,7 +1203,9 @@ def start(name, vmid=None, call=None):
         log.error("Unable to bring VM %s (%s) up..", name, vmid)
         raise SaltCloudExecutionFailure
 
-    # xxx: TBD: Check here whether the status was actually changed to 'started'
+    log.debug('Waiting for state "running" for vm %s on %s', vmid, name)
+    if not wait_for_state(vmid, "running"):
+        return {"Error": "Unable to start {}, command timed out".format(name)}
 
     return {"Started": "{} was started.".format(name)}
 
