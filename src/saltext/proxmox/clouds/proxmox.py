@@ -120,10 +120,8 @@ def _authenticate():
     Retrieve CSRF and API tickets for the Proxmox API
     """
     global authenticated, token, ticket, csrf, verify_ssl
-    username = (
-        config.get_cloud_config_value(
-            "user", get_configured_provider(), __opts__, search_global=False
-        ),
+    username = config.get_cloud_config_value(
+        "user", get_configured_provider(), __opts__, search_global=False
     )
     passwd = config.get_cloud_config_value(
         "password", get_configured_provider(), __opts__, search_global=False
