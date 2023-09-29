@@ -14,6 +14,7 @@ from tests.support.mock import ANY
 from tests.support.mock import call
 from tests.support.mock import MagicMock
 from tests.support.mock import patch
+from tests.utils.names import fqn
 
 
 @pytest.fixture
@@ -109,31 +110,32 @@ def test__dictionary_to_stringlist():
     assert result == "a=a,b=b"
 
 
-def test__reconfigure_clone_net_hdd(vm):
-
+@patch(fqn(proxmox._get_properties), MagicMock(return_value=["net0", "ide0", "sata0", "scsi0"]))
+@patch(fqn(proxmox._query))
+def test__reconfigure_clone_net_hdd(mock_query, vm):
     # The return_value is for the net reconfigure assertions, it is irrelevant for the rest
-    with patch(
-        "saltext.proxmox.clouds.proxmox._get_properties",
-        MagicMock(return_value=["net0", "ide0", "sata0", "scsi0"]),
-    ), patch.object(proxmox, "query", return_value={"net0": "c=overwritten,g=h"}) as query:
-        # Test a vm that lacks the required attributes
-        proxmox._reconfigure_clone({}, 0)
-        query.assert_not_called()
+    mock_query.return_value = {"net0": "c=overwritten,g=h"}
 
-        # Test a fully mocked vm
-        proxmox._reconfigure_clone(vm, 0)
+    # Test a vm that lacks the required attributes
+    proxmox._reconfigure_clone({}, 0)
+    mock_query.assert_not_called()
 
-        # net reconfigure
-        query.assert_any_call("get", "nodes/127.0.0.1/qemu/0/config")
-        query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"net0": "a=b,c=d,g=h"})
+    # Test a fully mocked vm
+    proxmox._reconfigure_clone(vm, 0)
 
-        # hdd reconfigure
-        query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"ide0": "data"})
-        query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"sata0": "data"})
-        query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"scsi0": "data"})
+    # net reconfigure
+    mock_query.assert_any_call("get", "nodes/127.0.0.1/qemu/0/config")
+    mock_query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"net0": "a=b,c=d,g=h"})
+
+    # hdd reconfigure
+    mock_query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"ide0": "data"})
+    mock_query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"sata0": "data"})
+    mock_query.assert_any_call("post", "nodes/127.0.0.1/qemu/0/config", {"scsi0": "data"})
 
 
-def test__reconfigure_clone_params():
+@patch(fqn(proxmox._get_properties))
+@patch(fqn(proxmox._query))
+def test__reconfigure_clone_params(mock_query, mock_get_properties):
     """
     Test cloning a VM with parameters to be reconfigured.
     """
@@ -166,91 +168,92 @@ def test__reconfigure_clone_params():
             )
         )
 
-    mock_query = MagicMock(return_value="")
-    with patch(
-        "saltext.proxmox.clouds.proxmox._get_properties",
-        MagicMock(return_value=list(properties.keys())),
-    ), patch("saltext.proxmox.clouds.proxmox.query", mock_query):
-        vm_ = {
-            "profile": "my_proxmox",
-            "driver": "proxmox",
-            "technology": "qemu",
-            "name": "new2",
-            "host": "myhost",
-            "clone": True,
-            "clone_from": 123,
-            "ip_address": "10.10.10.10",
-        }
-        vm_.update(properties)
+    mock_get_properties.return_value = list(properties.keys())
+    mock_query.return_value = ""
 
-        proxmox._reconfigure_clone(vm_, vmid)
-        mock_query.assert_has_calls(query_calls, any_order=True)
+    vm_ = {
+        "profile": "my_proxmox",
+        "driver": "proxmox",
+        "technology": "qemu",
+        "name": "new2",
+        "host": "myhost",
+        "clone": True,
+        "clone_from": 123,
+        "ip_address": "10.10.10.10",
+    }
+    vm_.update(properties)
+
+    proxmox._reconfigure_clone(vm_, vmid)
+    mock_query.assert_has_calls(query_calls, any_order=True)
 
 
-def test_clone():
+@patch(fqn(proxmox._get_properties), MagicMock(return_value=["vmid"]))
+@patch(fqn(proxmox._get_next_vmid), MagicMock(return_value=ANY))
+@patch(fqn(proxmox._query))
+def test_clone(mock_query):
     """
     Test that an integer value for clone_from
     """
-    mock_query = MagicMock(return_value="")
-    with patch("saltext.proxmox.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
-        "saltext.proxmox.clouds.proxmox.query", mock_query
-    ):
-        vm_ = {
-            "technology": "qemu",
-            "name": "new2",
-            "host": "myhost",
-            "clone": True,
-            "clone_from": 123,
-        }
+    vm_ = {
+        "technology": "qemu",
+        "name": "new2",
+        "host": "myhost",
+        "clone": True,
+        "clone_from": 123,
+    }
 
-        # CASE 1: Numeric ID
-        result = proxmox.create_node(vm_, ANY)
-        mock_query.assert_called_once_with(
-            "post",
-            "nodes/myhost/qemu/123/clone",
-            {"newid": ANY},
-        )
-        assert result == {"vmid": ANY}
+    # CASE 1: Numeric ID
+    result = proxmox._create_node(vm_)
+    mock_query.assert_called_once_with(
+        "post",
+        "nodes/myhost/qemu/123/clone",
+        {"newid": ANY},
+    )
+    assert result == {"vmid": ANY}
 
-        # CASE 2: host:ID notation
-        mock_query.reset_mock()
-        vm_["clone_from"] = "otherhost:123"
-        result = proxmox.create_node(vm_, ANY)
-        mock_query.assert_called_once_with(
-            "post",
-            "nodes/otherhost/qemu/123/clone",
-            {"newid": ANY},
-        )
-        assert result == {"vmid": ANY}
+    # CASE 2: host:ID notation
+    mock_query.reset_mock()
+    vm_["clone_from"] = "otherhost:123"
+    result = proxmox._create_node(vm_)
+    mock_query.assert_called_once_with(
+        "post",
+        "nodes/otherhost/qemu/123/clone",
+        {"newid": ANY},
+    )
+    assert result == {"vmid": ANY}
 
 
-def test_clone_pool():
+@patch(fqn(proxmox._get_properties), MagicMock(return_value=["vmid"]))
+@patch(fqn(proxmox._get_next_vmid), MagicMock(return_value=ANY))
+@patch(fqn(proxmox._query))
+def test_clone_pool(mock_query):
     """
     Test that cloning a VM passes the pool parameter if present
     """
-    mock_query = MagicMock(return_value="")
-    with patch("saltext.proxmox.clouds.proxmox._get_properties", MagicMock(return_value=[])), patch(
-        "saltext.proxmox.clouds.proxmox.query", mock_query
-    ):
-        vm_ = {
-            "technology": "qemu",
-            "name": "new2",
-            "host": "myhost",
-            "clone": True,
-            "clone_from": 123,
-            "pool": "mypool",
-        }
+    vm_ = {
+        "technology": "qemu",
+        "name": "new2",
+        "host": "myhost",
+        "clone": True,
+        "clone_from": 123,
+        "pool": "mypool",
+    }
 
-        result = proxmox.create_node(vm_, ANY)
-        mock_query.assert_called_once_with(
-            "post",
-            "nodes/myhost/qemu/123/clone",
-            {"newid": ANY, "pool": "mypool"},
-        )
-        assert result == {"vmid": ANY}
+    result = proxmox._create_node(vm_)
+    mock_query.assert_called_once_with(
+        "post",
+        "nodes/myhost/qemu/123/clone",
+        {"newid": ANY, "pool": "mypool"},
+    )
+    assert result == {"vmid": ANY}
 
 
-def test_clone_id():
+@patch(fqn(proxmox._get_properties), MagicMock(return_value=["vmid"]))
+@patch(fqn(proxmox._get_next_vmid), MagicMock(return_value=101))
+@patch(fqn(proxmox._set_vm_status), MagicMock(return_value=True))
+@patch(fqn(proxmox._wait_for_state))
+@patch(fqn(proxmox._query))
+def test_clone_id(mock_query, mock_wait_for_state):
     """
     Test cloning a VM with a specified vmid.
     """
@@ -265,148 +268,136 @@ def test_clone_id():
             return upid
         return None
 
-    mock_wait_for_state = MagicMock(return_value=True)
-    with patch(
-        "saltext.proxmox.clouds.proxmox._get_properties",
-        MagicMock(return_value=["vmid"]),
-    ), patch(
-        "saltext.proxmox.clouds.proxmox._get_next_vmid",
-        MagicMock(return_value=next_vmid),
-    ), patch(
-        "saltext.proxmox.clouds.proxmox.start", MagicMock(return_value=True)
-    ), patch(
-        "saltext.proxmox.clouds.proxmox.wait_for_state", mock_wait_for_state
-    ), patch(
-        "saltext.proxmox.clouds.proxmox.query", side_effect=mock_query_response
-    ):
-        vm_ = {
-            "profile": "my_proxmox",
-            "driver": "proxmox",
-            "technology": "qemu",
-            "name": "new2",
-            "host": "myhost",
-            "clone": True,
-            "clone_from": 123,
-            "ip_address": "10.10.10.10",
-        }
+    mock_wait_for_state.return_value = True
+    mock_query.side_effect = mock_query_response
 
-        # CASE 1: No vmid specified in profile (previous behavior)
-        proxmox.create(vm_)
-        mock_wait_for_state.assert_called_with(
-            next_vmid,
-            "running",
-        )
+    vm_ = {
+        "profile": "my_proxmox",
+        "driver": "proxmox",
+        "technology": "qemu",
+        "name": "new2",
+        "host": "myhost",
+        "clone": True,
+        "clone_from": 123,
+        "ip_address": "10.10.10.10",
+    }
 
-        # CASE 2: vmid specified in profile
-        vm_["vmid"] = explicit_vmid
-        proxmox.create(vm_)
-        mock_wait_for_state.assert_called_with(
-            explicit_vmid,
-            "running",
-        )
+    # CASE 1: No vmid specified in profile (previous behavior)
+    proxmox.create(vm_)
+    mock_wait_for_state.assert_called_with(
+        next_vmid,
+        "running",
+    )
+
+    # CASE 2: vmid specified in profile
+    vm_["vmid"] = explicit_vmid
+    proxmox.create(vm_)
+    mock_wait_for_state.assert_called_with(
+        explicit_vmid,
+        "running",
+    )
 
 
-def test_avail_images():
+@patch(fqn(proxmox.avail_locations), MagicMock(return_value={"node1": {}}))
+@patch(fqn(proxmox._query))
+def test_avail_images(mock_query):
     """
     Test avail_images with different values for location parameter
     """
-    with patch("saltext.proxmox.clouds.proxmox.avail_locations", return_value={"node1": {}}), patch(
-        "saltext.proxmox.clouds.proxmox.query", return_value=[]
-    ) as mock_query:
 
-        # CASE 1: location not set should default to "local"
-        proxmox.avail_images()
-        mock_query.assert_called_with("get", "nodes/{}/storage/{}/content".format("node1", "local"))
+    # CASE 1: location not set should default to "local"
+    proxmox.avail_images()
+    mock_query.assert_called_with("get", "nodes/{}/storage/{}/content".format("node1", "local"))
 
-        # CASE 2: location set should query location
-        kwargs = {"location": "other_storage"}
-        proxmox.avail_images(kwargs=kwargs)
-        mock_query.assert_called_with(
-            "get", "nodes/{}/storage/{}/content".format("node1", kwargs["location"])
-        )
+    # CASE 2: location set should query location
+    kwargs = {"location": "other_storage"}
+    proxmox.avail_images(kwargs=kwargs)
+    mock_query.assert_called_with(
+        "get", "nodes/{}/storage/{}/content".format("node1", kwargs["location"])
+    )
 
 
-def test_avail_locations():
+@patch(fqn(proxmox._query))
+def test_avail_locations(mock_query):
     """
     Test if the available locations make sense
     """
-    with patch(
-        "saltext.proxmox.clouds.proxmox.query",
-        return_value=[
-            {
-                "node": "node1",
-                "status": "online",
-            },
-            {
-                "node": "node2",
-                "status": "offline",
-            },
-        ],
-    ) as mock_query:
-        result = proxmox.avail_locations()
-        assert result == {
-            "node1": {
-                "node": "node1",
-                "status": "online",
-            },
-        }
+    mock_query.return_value = [
+        {
+            "node": "node1",
+            "status": "online",
+        },
+        {
+            "node": "node2",
+            "status": "offline",
+        },
+    ]
+
+    result = proxmox.avail_locations()
+    assert result == {
+        "node1": {
+            "node": "node1",
+            "status": "online",
+        },
+    }
 
 
-def test_find_agent_ips():
+@patch(fqn(proxmox._query))
+def test_find_agent_ips(mock_query):
     """
     Test find_agent_ip will return an IP
     """
 
-    with patch(
-        "saltext.proxmox.clouds.proxmox.query",
-        return_value={
-            "result": [
-                {
-                    "name": "eth0",
-                    "ip-addresses": [
-                        {"ip-address": "1.2.3.4", "ip-address-type": "ipv4"},
-                        {"ip-address": "2001::1:2", "ip-address-type": "ipv6"},
-                    ],
-                },
-                {
-                    "name": "eth1",
-                    "ip-addresses": [
-                        {"ip-address": "2.3.4.5", "ip-address-type": "ipv4"},
-                    ],
-                },
-                {
-                    "name": "dummy",
-                },
-            ]
-        },
-    ) as mock_query:
-        vm_ = {
-            "technology": "qemu",
-            "host": "myhost",
-            "driver": "proxmox",
-            "ignore_cidr": "1.0.0.0/8",
-        }
+    mock_query.return_value = {
+        "result": [
+            {
+                "name": "eth0",
+                "ip-addresses": [
+                    {"ip-address": "1.2.3.4", "ip-address-type": "ipv4"},
+                    {"ip-address": "2001::1:2", "ip-address-type": "ipv6"},
+                ],
+            },
+            {
+                "name": "eth1",
+                "ip-addresses": [
+                    {"ip-address": "2.3.4.5", "ip-address-type": "ipv4"},
+                ],
+            },
+            {
+                "name": "dummy",
+            },
+        ]
+    }
 
-        # CASE 1: Test ipv4 and ignore_cidr
-        result = proxmox._find_agent_ip(vm_, ANY)
-        mock_query.assert_any_call(
-            "get", "nodes/myhost/qemu/{}/agent/network-get-interfaces".format(ANY)
-        )
+    vm_ = {
+        "technology": "qemu",
+        "host": "myhost",
+        "driver": "proxmox",
+        "ignore_cidr": "1.0.0.0/8",
+    }
 
-        assert result == "2.3.4.5"
+    # CASE 1: Test ipv4 and ignore_cidr
+    result = proxmox._find_agent_ip(vm_, ANY)
+    mock_query.assert_any_call(
+        "get", "nodes/myhost/qemu/{}/agent/network-get-interfaces".format(ANY)
+    )
 
-        # CASE 2: Test ipv6
+    assert result == "2.3.4.5"
 
-        vm_["protocol"] = "ipv6"
-        result = proxmox._find_agent_ip(vm_, ANY)
-        mock_query.assert_any_call(
-            "get", "nodes/myhost/qemu/{}/agent/network-get-interfaces".format(ANY)
-        )
+    # CASE 2: Test ipv6
 
-        assert result == "2001::1:2"
+    vm_["protocol"] = "ipv6"
+    result = proxmox._find_agent_ip(vm_, ANY)
+    mock_query.assert_any_call(
+        "get", "nodes/myhost/qemu/{}/agent/network-get-interfaces".format(ANY)
+    )
+
+    assert result == "2001::1:2"
 
 
-def test__authenticate_with_token():
+@patch("salt.config.get_cloud_config_value")
+@patch("requests.post")
+def test__authenticate_with_token(mock_post, mock_get_cloud_config_value):
     """
     Test that no ticket is requested when using an API token
     """
@@ -416,17 +407,15 @@ def test__authenticate_with_token():
         True,
         "faketoken",
     ]
-    requests_post_mock = MagicMock()
-    with patch(
-        "salt.config.get_cloud_config_value",
-        autospec=True,
-        side_effect=get_cloud_config_mock,
-    ), patch("requests.post", requests_post_mock):
-        proxmox._authenticate()
-        requests_post_mock.assert_not_called()
+
+    mock_get_cloud_config_value.side_effect = get_cloud_config_mock
+
+    proxmox._authenticate()
+    mock_post.assert_not_called()
 
 
-def test__get_url_with_custom_port():
+@patch("salt.config.get_cloud_config_value")
+def test__get_url_with_custom_port(mock_get_cloud_config_value):
     """
     Test the use of a custom port for Proxmox connection
     """
@@ -434,25 +423,22 @@ def test__get_url_with_custom_port():
         "proxmox.connection.url",
         "9999",
     ]
-    with patch(
-        "salt.config.get_cloud_config_value",
-        autospec=True,
-        side_effect=get_cloud_config_mock,
-    ):
-        assert proxmox._get_url() == "https://proxmox.connection.url:9999"
+
+    mock_get_cloud_config_value.side_effect = get_cloud_config_mock
+
+    assert proxmox._get_url() == "https://proxmox.connection.url:9999"
 
 
-def _test__import_api(response):
+@patch("requests.get")
+def _test__import_api(mock_get, response):
     """
     Test _import_api recognition of varying Proxmox VE responses.
     """
-    requests_get_mock = MagicMock()
-    requests_get_mock.return_value.status_code = 200
-    requests_get_mock.return_value.text = response
-    with patch("requests.get", requests_get_mock):
-        proxmox._import_api()
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.text = response
+
+    proxmox._import_api()
     assert proxmox.api == [{"info": {}}]
-    return
 
 
 def test__import_api_v6():
@@ -470,7 +456,7 @@ def test__import_api_v6():
         ;
         """
     )
-    _test__import_api(response)
+    _test__import_api(response=response)  # pylint: disable=no-value-for-parameter
 
 
 def test__import_api_v7():
@@ -488,23 +474,25 @@ def test__import_api_v7():
         ;
         """
     )
-    _test__import_api(response)
+    _test__import_api(response=response)  # pylint: disable=no-value-for-parameter
 
 
-def test__authenticate_success():
+@patch("requests.post")
+def test__authenticate_success(mock_post):
     response = requests.Response()
     response.status_code = 200
     response.reason = "OK"
     response.raw = io.BytesIO(
         b"""{"data":{"CSRFPreventionToken":"01234567:dG9rZW4=","ticket":"PVE:cloud@pve:01234567::dGlja2V0"}}"""
     )
-    with patch("requests.post", return_value=response):
-        proxmox._authenticate()
+
+    mock_post.return_value = response
+    proxmox._authenticate()
     assert proxmox.csrf and proxmox.ticket
-    return
 
 
-def test__authenticate_failure():
+@patch("requests.post")
+def test__authenticate_failure(mock_post):
     """
     Confirm that authentication failure raises an exception.
     """
@@ -512,12 +500,14 @@ def test__authenticate_failure():
     response.status_code = 401
     response.reason = "authentication failure"
     response.raw = io.BytesIO(b"""{"data":null}""")
-    with patch("requests.post", return_value=response):
-        pytest.raises(requests.exceptions.HTTPError, proxmox._authenticate)
-    return
+
+    mock_post.return_value = response
+    pytest.raises(requests.exceptions.HTTPError, proxmox._authenticate)
 
 
-def test_creation_failure_logging(caplog):
+@patch(fqn(proxmox._get_properties), MagicMock(return_value=set()))
+@patch(fqn(proxmox._query))
+def test_creation_failure_logging(mock_query, caplog):
     """
     Test detailed logging on HTTP errors during VM creation.
     """
@@ -549,21 +539,19 @@ def test_creation_failure_logging(caplog):
             return response
         return None
 
-    with patch.object(proxmox, "query", side_effect=mock_query_response), patch.object(
-        proxmox, "_get_properties", return_value=set()
-    ):
-        assert proxmox.create(vm_) is False
+    mock_query.side_effect = mock_query_response
 
-        # Search for these messages in a multi-line log entry.
-        missing = {
-            "{} Client Error: {} for url:".format(response.status_code, response.reason),
-            response.text,
-        }
-        for required in list(missing):
-            for record in caplog.records:
-                if required in record.message:
-                    missing.remove(required)
-                    break
-        if missing:
-            raise AssertionError("Did not find error messages: {}".format(sorted(list(missing))))
-    return
+    assert proxmox.create(vm_) is False
+
+    # Search for these messages in a multi-line log entry.
+    missing = {
+        "{} Client Error: {} for url:".format(response.status_code, response.reason),
+        response.text,
+    }
+    for required in list(missing):
+        for record in caplog.records:
+            if required in record.message:
+                missing.remove(required)
+                break
+    if missing:
+        raise AssertionError("Did not find error messages: {}".format(sorted(list(missing))))
