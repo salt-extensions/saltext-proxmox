@@ -2,12 +2,7 @@
 Proxmox Cloud Module
 ======================
 
-.. versionadded:: 2014.7.0
-
-.. versionchanged:: 3006.0
-
-The Proxmox cloud module is used to control access to cloud providers using
-the Proxmox system (KVM / LXC).
+The Proxmox cloud module is used to control access to Proxmox
 
 Set up the cloud configuration at ``/etc/salt/cloud.providers`` or
  ``/etc/salt/cloud.providers.d/proxmox.conf``:
@@ -15,31 +10,114 @@ Set up the cloud configuration at ``/etc/salt/cloud.providers`` or
 .. code-block:: yaml
 
     my-proxmox-config:
-      # Proxmox account information
-      user: myuser@pam or myuser@pve
-      password: mypassword
-      url: hypervisor.domain.tld
-      port: 8006
+      # Required parameters
+      user: myuser@pam # or myuser@pve
+      token: myapitoken
+      url: https://hypervisor.domain.tld:8006
       driver: proxmox
-      verify_ssl: True
 
-:maintainer: Frank Klaassen <frank@cloudright.nl>
+Profile configuration examples:
+
+.. collapse:: Create a new LXC container
+
+    .. code-block:: yaml
+
+        my-lxc-container:
+            provider: my-proxmox-config
+            technology: lxc
+
+            # Required for cloud.bootstrap()
+            ssh_host: 192.168.101.2
+            ssh_username: root
+            ssh_password: supersecret
+
+            create:
+                # Required parameters
+                vmid: 123
+                ostemplate:  local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
+                node: proxmox-node1
+
+                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc
+                net0: name=eth0,bridge=vmbr0,firewall=1,gw=192.168.101.1,ip=192.168.101.2/24,tag=101,type=veth
+                password: supersecret
+
+.. collapse:: Clone an existing LXC container
+
+    .. code-block:: yaml
+
+       my-lxc-container:
+            provider: my-proxmox-config
+            technology: lxc
+
+            # Required for cloud.bootstrap()
+            ssh_host: 192.168.101.2
+            ssh_username: root
+            ssh_password: supersecret
+
+            clone:
+                # Required parameters
+                vmid: 123
+                newid: 456
+                node: proxmox-node1
+
+                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/clone
+                description: cloned vm
+
+.. collapse:: Create a new QEMU VM
+
+    .. code-block:: yaml
+
+        my-qemu-vm:
+            provider: my-proxmox-config
+            technology: qemu
+
+            # Required for cloud.bootstrap()
+            ssh_host: 192.168.101.2
+            ssh_username: root
+            ssh_password: supersecret
+
+            create:
+                # Required parameters
+                vmid: 123
+                node: proxmox-node1
+
+                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu
+                ipconfig0: ip=192.168.101.2/24,gw=192.168.101.1
+
+.. collapse:: Clone an existing QEMU VM:
+
+    .. code-block:: yaml
+
+        my-qemu-vm:
+            provider: my-proxmox-config
+            technology: qemu
+
+            # Required for cloud.bootstrap()
+            ssh_host: 192.168.101.2
+            ssh_username: root
+            ssh_password: supersecret
+
+            clone:
+                # Required parameters
+                vmid: 123
+                newid: 456
+                node: proxmox-node1
+
+                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/clone
+                description: cloned vm
+
+:maintainer: Bernhard Gally <github.com/I3urny>
 :depends: requests >= 2.2.1
 """
 import logging
-import pprint
-import re
-import socket
 import time
-import urllib
-from ipaddress import ip_address
-from ipaddress import ip_network
+from ipaddress import ip_interface
 
 import salt.config as config
 import salt.utils.cloud
 import salt.utils.json
-from salt.exceptions import SaltCloudExecutionFailure
 from salt.exceptions import SaltCloudExecutionTimeout
+from salt.exceptions import SaltCloudNotFound
 from salt.exceptions import SaltCloudSystemExit
 
 try:
@@ -57,7 +135,7 @@ __virtualname__ = "proxmox"
 
 def __virtual__():
     """
-    Check for PROXMOX configurations
+    Check for Proxmox configurations
     """
     if get_configured_provider() is False:
         return False
@@ -80,7 +158,9 @@ def get_configured_provider():
     Return the first configured instance.
     """
     return config.is_provider_configured(
-        __opts__, _get_active_provider_name() or __virtualname__, ("user",)
+        __opts__,
+        _get_active_provider_name() or __virtualname__,
+        ("url", "user", "token"),
     )
 
 
@@ -92,325 +172,171 @@ def get_dependencies():
     return config.check_driver_dependencies(__virtualname__, deps)
 
 
-authenticated = False
-token = None
-ticket = None
-csrf = None
-verify_ssl = None
-api = None
-
-
-def _get_url():
+def create(vm_):
     """
-    Retrieve URL of the Proxmox API
+    Create a single Proxmox VM.
     """
-    url = config.get_cloud_config_value(
-        "url", get_configured_provider(), __opts__, search_global=False
-    )
-    port = config.get_cloud_config_value(
-        "port", get_configured_provider(), __opts__, default=8006, search_global=False
-    )
-    if not url:
-        raise SaltCloudExecutionFailure("Url missing from provider config")
-    return "https://{}:{}".format(url, port)
-
-
-def _authenticate():
-    """
-    Retrieve CSRF and API tickets for the Proxmox API
-    """
-    global authenticated, token, ticket, csrf, verify_ssl
-    username = (
-        config.get_cloud_config_value(
-            "user", get_configured_provider(), __opts__, search_global=False
+    __utils__["cloud.fire_event"](
+        "event",
+        "starting create",
+        "salt/cloud/{}/creating".format(vm_["name"]),
+        args=__utils__["cloud.filter_event"](
+            "creating", vm_, ["name", "profile", "provider", "driver"]
         ),
-    )
-    passwd = config.get_cloud_config_value(
-        "password", get_configured_provider(), __opts__, search_global=False
-    )
-    api_token = config.get_cloud_config_value(
-        "token", get_configured_provider(), __opts__, search_global=False
+        sock_dir=__opts__["sock_dir"],
+        transport=__opts__["transport"],
     )
 
-    verify_ssl = config.get_cloud_config_value(
-        "verify_ssl",
-        get_configured_provider(),
-        __opts__,
-        default=True,
-        search_global=False,
-    )
+    type = vm_.get("technology")
 
-    if passwd:
-        # Authentication is done via the URL resulting in a ticket.
-        log.debug("Using password auth for %s", username)
+    clone_options = vm_.get("clone")
+    should_clone = True if clone_options else False
 
-        url = "{}/api2/json/access/ticket".format(_get_url())
-        connect_data = {"username": username, "password": passwd}
-
-        response = requests.post(url, verify=verify_ssl, data=connect_data)
-        response.raise_for_status()
-        returned_data = response.json()
-
-        ticket = {"PVEAuthCookie": returned_data["data"]["ticket"]}
-        csrf = str(returned_data["data"]["CSRFPreventionToken"])
+    if should_clone:
+        clone(call="function", kwargs=clone_options)
     else:
-        # Token is provided to the API as a header.
-        log.debug("Using token auth for %s", username)
+        _query("POST", f"nodes/{vm_['create']['node']}/{type}", vm_["create"])
 
-        token = "PVEAPIToken={}!{}".format(username[0], api_token)
+    # cloud.bootstrap expects the ssh_password to be set in vm_["password"]
+    vm_["password"] = vm_.get("ssh_password")
+    ret = __utils__["cloud.bootstrap"](vm_, __opts__)
 
-    authenticated = True
+    ret.update(show_instance(call="action", name=vm_["name"]))
+
+    __utils__["cloud.fire_event"](
+        "event",
+        "created instance",
+        f"salt/cloud/{vm_['name']}/created",
+        args=__utils__["cloud.filter_event"](
+            "created", vm_, ["name", "profile", "provider", "driver"]
+        ),
+        sock_dir=__opts__["sock_dir"],
+        transport=__opts__["transport"],
+    )
+
+    return ret
 
 
-def query(conn_type, option, post_data=None):
+def clone(call=None, kwargs=None):
     """
-    Execute the HTTP request to the API
+    Clone a VM
+
+    kwargs
+        Parameters to be passed as dict.
+
+    For required and optional parameters please check the Proxmox API documentation:
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/{vmid}/clone``
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/clone``
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-cloud -f clone my-proxmox-config vmid=123 newid=456
     """
-    if not authenticated:
-        log.debug("Not authenticated yet, doing that now..")
-        _authenticate()
+    if call != "function":
+        raise SaltCloudSystemExit("The clone function must be called with -f or --function.")
 
-    url = "{}/api2/json/{}".format(_get_url(), option)
+    if not isinstance(kwargs, dict):
+        kwargs = {}
 
-    log.debug("%s: %s (%s)", conn_type, url, post_data)
+    vmid = kwargs.get("vmid")
 
-    httpheaders = {
-        "Accept": "application/json",
-        "User-Agent": "salt-cloud-proxmox",
+    vm = _get_vm_by_id(vmid)
+
+    _query("POST", f"nodes/{vm['node']}/{vm['type']}/{vmid}/clone", kwargs)
+
+    # TODO: optionally wait for it to exist
+    # timeout = 300
+    # start_time = time.time()
+    # while time.time() < start_time + timeout:
+    #     try:
+    #         _get_vm_by_id(newid)
+    #     except SaltCloudNotFound:
+    #         log.debug("blabla")
+
+    # raise SaltCloudExecutionTimeout("Timeout to wait for VM cloning reached")
+
+
+def reconfigure(call=None, name=None, kwargs=None):
+    """
+    Reconfigure a Proxmox VM
+
+    name
+        The name of VM to be be reconfigured.
+
+    kwargs
+        Addtional parameters to be passed as dict.
+
+    For additional parameters please check the Proxmox API documentation:
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/{vmid}/config``
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/config``
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-cloud -a reconfigure vm_name
+    """
+    if call == "function":
+        raise SaltCloudSystemExit(
+            "The reconfigure action must be called with -d, --destroy, -a or --action."
+        )
+
+    vm = _get_vm_by_name(name)
+
+    _query("PUT", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}/config", kwargs)
+
+    return {
+        "success": True,
+        "action": "reconfigure",
     }
-    if conn_type != "get":
-        httpheaders["Content-Type"] = "application/x-www-form-urlencoded"
-        if token:
-            # Not using a ticket but a token
-            httpheaders["Authorization"] = token
-        else:
-            # When we're making changes using a ticket the API requires a CSRF
-            # header to guard against man in the middle attacks.
-            # So skip this for an HTTP GET.
-            httpheaders["CSRFPreventionToken"] = csrf
-
-    if conn_type == "post":
-        response = requests.post(
-            url,
-            verify=verify_ssl,
-            data=post_data,
-            cookies=ticket,
-            headers=httpheaders,
-        )
-    elif conn_type == "put":
-        response = requests.put(
-            url,
-            verify=verify_ssl,
-            data=post_data,
-            cookies=ticket,
-            headers=httpheaders,
-        )
-    elif conn_type == "delete":
-        response = requests.delete(
-            url,
-            verify=verify_ssl,
-            data=post_data,
-            cookies=ticket,
-            headers=httpheaders,
-        )
-    elif conn_type == "get":
-        response = requests.get(
-            url,
-            verify=verify_ssl,
-            cookies=ticket,
-            headers=httpheaders,
-        )
-
-    try:
-        response.raise_for_status()
-    except requests.exceptions.RequestException:
-        # Log the details of the response.
-        log.error("Error in %s query to %s:\n%s", conn_type, url, response.text)
-        raise
-
-    try:
-        returned_data = response.json()
-        if "data" not in returned_data:
-            raise SaltCloudExecutionFailure
-        return returned_data["data"]
-    except Exception:  # pylint: disable=broad-except
-        log.error("Error in trying to process JSON")
-        log.error(response)
 
 
-def _get_vm_by_name(name, allDetails=False):
+def destroy(call=None, name=None):
     """
-    Since Proxmox works based op id's rather than names as identifiers this
-    requires some filtering to retrieve the required information.
-    """
-    vms = get_resources_vms(includeConfig=allDetails)
-    if name in vms:
-        return vms[name]
+    Destroy a Proxmox VM by name
 
-    log.info('VM with name "%s" could not be found.', name)
-    return False
-
-
-def _get_vm_by_id(vmid, allDetails=False):
-    """
-    Retrieve a VM based on the ID.
-    """
-    for vm_name, vm_details in get_resources_vms(includeConfig=allDetails).items():
-        if str(vm_details["vmid"]) == str(vmid):
-            return vm_details
-
-    log.info('VM with ID "%s" could not be found.', vmid)
-    return False
-
-
-def _get_next_vmid():
-    """
-    Proxmox allows the use of alternative ids instead of autoincrementing.
-    Because of that its required to query what the first available ID is.
-    """
-    return int(query("get", "cluster/nextid"))
-
-
-def _parse_proxmox_upid(node, vm_=None):
-    """
-    Upon requesting a task that runs for a longer period of time a UPID is given.
-    This includes information about the job and can be used to lookup information in the log.
-    """
-    ret = {}
-
-    upid = node
-    # Parse node response
-    node = node.split(":")
-    if node[0] == "UPID":
-        ret["node"] = str(node[1])
-        ret["pid"] = str(node[2])
-        ret["pstart"] = str(node[3])
-        ret["starttime"] = str(node[4])
-        ret["type"] = str(node[5])
-        ret["vmid"] = str(node[6])
-        ret["user"] = str(node[7])
-        # include the upid again in case we'll need it again
-        ret["upid"] = str(upid)
-
-        if vm_ is not None and "technology" in vm_:
-            ret["technology"] = str(vm_["technology"])
-
-    return ret
-
-
-def _lookup_proxmox_task(upid):
-    """
-    Retrieve the (latest) logs and retrieve the status for a UPID.
-    This can be used to verify whether a task has completed.
-    """
-    log.debug("Getting creation status for upid: %s", upid)
-    tasks = query("get", "cluster/tasks")
-
-    if tasks:
-        for task in tasks:
-            if task["upid"] == upid:
-                log.debug("Found upid task: %s", task)
-                return task
-
-    return False
-
-
-def get_resources_nodes(call=None, resFilter=None):
-    """
-    Retrieve all hypervisors (nodes) available on this environment
+    name
+        The name of VM to be be destroyed.
 
     CLI Example:
 
     .. code-block:: bash
 
-        salt-cloud -f get_resources_nodes my-proxmox-config
+        salt-cloud -d vm_name
     """
-    log.debug("Getting resource: nodes.. (filter: %s)", resFilter)
-    resources = query("get", "cluster/resources")
+    if call == "function":
+        raise SaltCloudSystemExit(
+            "The destroy action must be called with -d, --destroy, -a or --action."
+        )
 
-    ret = {}
-    for resource in resources:
-        if "type" in resource and resource["type"] == "node":
-            name = resource["node"]
-            ret[name] = resource
+    __utils__["cloud.fire_event"](
+        "event",
+        "destroying instance",
+        f"salt/cloud/{name}/destroying",
+        args={"name": name},
+        sock_dir=__opts__["sock_dir"],
+        transport=__opts__["transport"],
+    )
 
-    if resFilter is not None:
-        log.debug("Filter given: %s, returning requested resource: nodes", resFilter)
-        return ret[resFilter]
+    vm = _get_vm_by_name(name)
 
-    log.debug("Filter not given: %s, returning all resource: nodes", ret)
-    return ret
+    _query("DELETE", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}")
 
-
-def get_resources_vms(call=None, resFilter=None, includeConfig=True):
-    """
-    Retrieve all VMs available on this environment
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud -f get_resources_vms my-proxmox-config
-    """
-    timeoutTime = time.time() + 60
-    while True:
-        log.debug("Getting resource: vms.. (filter: %s)", resFilter)
-        resources = query("get", "cluster/resources")
-        ret = {}
-        badResource = False
-        for resource in resources:
-            if "type" in resource and resource["type"] in ["qemu", "lxc"]:
-                try:
-                    name = resource["name"]
-                except KeyError:
-                    badResource = True
-                    log.debug("No name in VM resource %s", repr(resource))
-                    break
-
-                ret[name] = resource
-
-                if includeConfig:
-                    # Requested to include the detailed configuration of a VM
-                    ret[name]["config"] = get_vmconfig(
-                        ret[name]["vmid"], ret[name]["node"], ret[name]["type"]
-                    )
-
-        if time.time() > timeoutTime:
-            raise SaltCloudExecutionTimeout("FAILED to get the proxmox resources vms")
-
-        # Carry on if there wasn't a bad resource return from Proxmox
-        if not badResource:
-            break
-
-        time.sleep(0.5)
-
-    if resFilter is not None:
-        log.debug("Filter given: %s, returning requested resource: nodes", resFilter)
-        return ret[resFilter]
-
-    log.debug("Filter not given: %s, returning all resource: nodes", ret)
-    return ret
-
-
-def script(vm_):
-    """
-    Return the script deployment object
-    """
-    script_name = config.get_cloud_config_value("script", vm_, __opts__)
-    if not script_name:
-        script_name = "bootstrap-salt"
-
-    return salt.utils.cloud.os_script(
-        script_name,
-        vm_,
-        __opts__,
-        salt.utils.cloud.salt_config_to_yaml(salt.utils.cloud.minion_config(__opts__, vm_)),
+    __utils__["cloud.fire_event"](
+        "event",
+        "destroyed instance",
+        f"salt/cloud/{name}/destroyed",
+        args={"name": name},
+        sock_dir=__opts__["sock_dir"],
+        transport=__opts__["transport"],
     )
 
 
 def avail_locations(call=None):
     """
-    Return a list of the hypervisors (nodes) which this Proxmox PVE machine manages
+    Return available Proxmox datacenter locations
 
     CLI Example:
 
@@ -424,30 +350,35 @@ def avail_locations(call=None):
             "-f or --function, or with the --list-locations option"
         )
 
-    # could also use the get_resources_nodes but speed is ~the same
-    nodes = query("get", "nodes")
+    locations = _query("GET", "nodes")
 
     ret = {}
-    for node in nodes:
-        name = node["node"]
-        if node["status"] == "online":
-            ret[name] = node
+    for location in locations:
+        name = location["node"]
+        if location.get("status") == "online":
+            ret[name] = location
         else:
-            log.warning("Node %s is %s, ignoring it", name, node["status"])
+            log.warning("Ignoring Proxmox node '%s' because it is not online.", name)
 
     return ret
 
 
 def avail_images(call=None, kwargs=None):
     """
-    Return a list of the images that are on the provider
+    Return available Proxmox images
+
+    storage
+        Name of the storage location that should be searched.
+
+    kwargs
+        Addtional parameters to be passed as dict.
 
     CLI Example:
 
     .. code-block:: bash
 
         salt-cloud --list-images my-proxmox-config
-        salt-cloud -f avail_images my-proxmox-config location="storage_location"
+        salt-cloud -f avail_images my-proxmox-config storage="storage1"
     """
     if call == "action":
         raise SaltCloudSystemExit(
@@ -458,15 +389,15 @@ def avail_images(call=None, kwargs=None):
     if not isinstance(kwargs, dict):
         kwargs = {}
 
-    if "location" in kwargs:
-        location = kwargs["location"]
-    else:
-        location = "local"
+    storage = kwargs.get("storage", "local")
 
     ret = {}
-    for host_name, host_details in avail_locations().items():
-        for item in query("get", "nodes/{}/storage/{}/content".format(host_name, location)):
-            ret[item["volid"]] = item
+    for location in avail_locations():
+        for item in _query("GET", f"nodes/{location}/storage/{storage}/content"):
+            ret[location] = {}
+            ret[location][item["volid"]] = item
+            # TODO: filter to actual images. what is an imagetype? images, vztmpl, iso
+
     return ret
 
 
@@ -478,68 +409,63 @@ def list_nodes(call=None):
 
     .. code-block:: bash
 
-        salt-cloud -Q my-proxmox-config
+        salt-cloud -Q
+        salt-cloud -f list_nodes my-proxmox-config
     """
     if call == "action":
         raise SaltCloudSystemExit("The list_nodes function must be called with -f or --function.")
 
+    vms = _query("GET", "cluster/resources", data={"type": "vm"})
+
     ret = {}
-    for vm_name, vm_details in get_resources_vms(includeConfig=True).items():
-        log.debug("VM_Name: %s", vm_name)
-        log.debug("vm_details: %s", vm_details)
+    for vm in vms:
+        name = vm["name"]
+        ret[name]["id"] = str(vm["vmid"])
+        ret[name]["image"] = ""  # proxmox does not carry that information
+        ret[name]["size"] = ""  # proxmox does not have VM sizes like AWS (e.g: t2-small)
+        ret[name]["state"] = str(vm["status"])
 
-        # Limit resultset on what Salt-cloud demands:
-        ret[vm_name] = {}
-        ret[vm_name]["id"] = str(vm_details["vmid"])
-        ret[vm_name]["image"] = str(vm_details["vmid"])
-        ret[vm_name]["size"] = str(vm_details["disk"])
-        ret[vm_name]["state"] = str(vm_details["status"])
+        config = _query("GET", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}/config")
+        private_ips, public_ips = _parse_ips(config, vm["type"])
 
-        # Figure out which is which to put it in the right column
-        private_ips = []
-        public_ips = []
-
-        if "ip_address" in vm_details["config"] and vm_details["config"]["ip_address"] != "-":
-            ips = vm_details["config"]["ip_address"].split(" ")
-            for ip_ in ips:
-                if ip_address(ip_).is_private:
-                    private_ips.append(str(ip_))
-                else:
-                    public_ips.append(str(ip_))
-
-        ret[vm_name]["private_ips"] = private_ips
-        ret[vm_name]["public_ips"] = public_ips
+        ret[name]["private_ips"] = private_ips
+        ret[name]["public_ips"] = public_ips
 
     return ret
 
 
 def list_nodes_full(call=None):
     """
-    Return a list of the VMs that are on the provider
+    Return a list of the VMs that are managed by the provider, with full configuration details
 
     CLI Example:
 
     .. code-block:: bash
 
-        salt-cloud -F my-proxmox-config
+        salt-cloud -F
+        salt-cloud -f list_nodes_full my-proxmox-config
     """
     if call == "action":
         raise SaltCloudSystemExit(
             "The list_nodes_full function must be called with -f or --function."
         )
 
-    return get_resources_vms(includeConfig=True)
+    vms = _query("GET", "cluster/resources", data={"type": "vm"})
+
+    ret = {}
+    for vm in vms:
+        name = vm["name"]
+        config = _query("GET", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}/config")
+
+        ret[name] = vm
+        ret[name]["config"] = config
+
+    return ret
 
 
 def list_nodes_select(call=None):
     """
-    Return a list of the VMs that are on the provider, with select fields
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud -S my-proxmox-config
+    Return a list of the VMs that are managed by the provder, with select fields
     """
     return salt.utils.cloud.list_nodes_select(
         list_nodes_full(),
@@ -548,729 +474,315 @@ def list_nodes_select(call=None):
     )
 
 
+def show_instance(call=None, name=None):
+    """
+    Show the details from Proxmox concerning an instance
+
+    name
+        The name of the VM for which to display details.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-cloud -a show_instance vm_name
+    """
+    if call != "action":
+        raise SaltCloudSystemExit("The show_instance action must be called with -a or --action.")
+
+    for vm in list_nodes_full():
+        if vm["name"] == name:
+            return vm
+
+    raise SaltCloudNotFound(f"The specified VM named '{name}' could not be found.")
+
+
+def start(call=None, name=None, kwargs=None):
+    """
+    Start a node.
+
+    name
+        The name of the VM. Required.
+
+    kwargs
+        Addtional parameters to be passed as dict.
+
+    For additional parameters please check the Proxmox API documentation:
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/{vmid}/status/start``
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/status/start``
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-cloud -a start vm_name
+    """
+    if call != "action":
+        raise SaltCloudSystemExit("The start action must be called with -a or --action.")
+
+    _set_vm_status(name, "start", kwargs)
+
+    _wait_for_vm_status(name, "running")
+
+    return {
+        "success": True,
+        "state": "running",
+        "action": "start",
+    }
+
+
+def stop(call=None, name=None, kwargs=None):
+    """
+    Stop a node.
+
+    For additional parameters please check the Proxmox API documentation:
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/{vmid}/status/stop``
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/status/stop``
+
+    name
+        The name of the VM. Required.
+
+    kwargs
+        Addtional parameters to be passed as dict.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-cloud -a stop vm_name
+    """
+    if call != "action":
+        raise SaltCloudSystemExit("The stop action must be called with -a or --action.")
+
+    _set_vm_status(name, "stop", kwargs)
+
+    _wait_for_vm_status(name, "stopped")
+
+    return {
+        "success": True,
+        "state": "stopped",
+        "action": "stop",
+    }
+
+
+def shutdown(call=None, name=None, kwargs=None):
+    """
+    Shutdown a node.
+
+    name
+        The name of the VM. Required.
+
+    kwargs
+        Addtional parameters to be passed as dict.
+
+    For additional parameters please check the Proxmox API documentation:
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/{vmid}/status/shutdown``
+        * ``https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/status/shutdown``
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-cloud -a shutdown vm_name
+    """
+    if call != "action":
+        raise SaltCloudSystemExit("The shutdown action must be called with -a or --action.")
+
+    _set_vm_status(name, "shutdown", kwargs)
+
+    _wait_for_vm_status(name, "stopped")
+
+    return {
+        "success": True,
+        "state": "stopped",
+        "action": "shutdown",
+    }
+
+
+def _query(method, path, data=None):
+    """
+    Query the Proxmox API
+    """
+    base_url = _get_url()
+    api_token = _get_api_token()
+
+    url = f"{base_url}/api2/json/{path}"
+
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "salt-cloud-proxmox",
+        "Authorization": f"PVEAPIToken={api_token}",
+    }
+
+    try:
+        if method == "GET":
+            response = requests.get(
+                url=url,
+                # verify=verify_ssl,
+                headers=headers,
+                params=data,
+            )
+        else:
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+            response = requests.request(
+                method=method,
+                url=url,
+                # verify=verify_ssl,
+                headers=headers,
+                data=data,
+            )
+
+        response.raise_for_status()
+        returned_data = response.json()
+        return returned_data.get("data")
+
+    except requests.exceptions.RequestException as err:
+        log.error("Error in query to %s:\n%s", url, response.text)
+        raise SaltCloudSystemExit(err)
+
+
+def _get_url():
+    """
+    Returns the configured Proxmox URL
+    """
+    return config.get_cloud_config_value(
+        "url", get_configured_provider(), __opts__, search_global=False
+    )
+
+
+def _get_api_token():
+    """
+    Returns the API token for the Proxmox API
+    """
+    username = config.get_cloud_config_value(
+        "user", get_configured_provider(), __opts__, search_global=False
+    )
+    token = config.get_cloud_config_value(
+        "token", get_configured_provider(), __opts__, search_global=False
+    )
+    # not sure we should actually support this as it's insecure
+    # verify_ssl = config.get_cloud_config_value(
+    #     "token", get_configured_provider(), __opts__, search_global=False
+    # )
+    return f"{username}!{token}"
+
+
+def _get_vm_by_name(name):
+    """
+    Return VM identified by name
+
+    name
+        The name of the VM. Required.
+
+    .. note:
+
+        This function will return the first occurrence of a VM matching the given name.
+    """
+    vms = _query("GET", "cluster/resources", {"type": "vm"})
+    for vm in vms:
+        if vm["name"] == name:
+            return vm
+
+    raise SaltCloudNotFound(f"The specified VM with name '{name}' could not be found.")
+
+
+def _get_vm_by_id(vm_vmid):
+    """
+    Return VM identified by vmid.
+
+    vm_vmid
+        The vmid of the VM. Required.
+    """
+    vms = _query("GET", "cluster/resources", {"type": "vm"})
+    for vm in vms:
+        if vm["vmid"] == vm_vmid:
+            return vm
+
+    raise SaltCloudNotFound(f"The specified VM with vmid '{vm_vmid}' could not be found.")
+
+
+def _set_vm_status(name, status, kwargs=None):
+    """
+    Set the VM status
+
+    name
+        The name of the VM. Required.
+
+    status
+        The target status of the VM. Required.
+
+    kwargs
+        Addtional parameters to be passed as dict.
+    """
+    vm = _get_vm_by_name(name)
+
+    _query("POST", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}/status/{status}", kwargs)
+
+
+def _wait_for_vm_status(name, status, timeout=300, interval=0.2):
+    """
+    Wait for the VM to reach a given status
+
+    name
+        The name of the VM. Required.
+
+    status
+        The expected status of the VM. Required.
+
+    timeout
+        The timeout in seconds on how long to wait for the task. Default: 300 seconds
+
+    interval
+        The interval in seconds at which the API should be queried for updates. Default: .2 seconds
+    """
+    vm = _get_vm_by_name(name)
+
+    start_time = time.time()
+    while time.time() < start_time + timeout:
+        response = _query("GET", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}/status/current")
+
+        if response["status"] == status:
+            return True
+
+        time.sleep(interval)
+
+    raise SaltCloudExecutionTimeout("Timeout to wait for VM status reached.")
+
+
 def _stringlist_to_dictionary(input_string):
     """
     Convert a stringlist (comma separated settings) to a dictionary
 
-    The result of the string setting1=value1,setting2=value2 will be a python dictionary:
+    The result of the string "setting1=value1,setting2=value2" will be a python dictionary:
 
     {'setting1':'value1','setting2':'value2'}
     """
     return dict(item.strip().split("=") for item in input_string.split(",") if item)
 
 
-def _dictionary_to_stringlist(input_dict):
+def _parse_ips(vm_config, vm_type):
     """
-    Convert a dictionary to a stringlist (comma separated settings)
-
-    The result of the dictionary {'setting1':'value1','setting2':'value2'} will be:
-
-    setting1=value1,setting2=value2
+    Parse IPs from a Proxmox VM config
     """
-    return ",".join("{}={}".format(k, input_dict[k]) for k in sorted(input_dict.keys()))
+    private_ips = []
+    public_ips = []
 
+    ip_configs = []
+    if vm_type == "lxc":
+        ip_configs = [v for k, v in vm_config.items() if k.startswith("net")]
+    else:
+        ip_configs = [v for k, v in vm_config.items() if k.startswith("ipconfig")]
 
-def _reconfigure_clone(vm_, vmid):
-    """
-    If we cloned a machine, see if we need to reconfigure any of the options such as net0,
-    ide2, etc. This enables us to have a different cloud-init ISO mounted for each VM that's brought up
-    :param vm_:
-    :return:
-    """
-    if not vm_.get("technology") == "qemu":
-        log.warning("Reconfiguring clones is only available under `qemu`")
-        return
+    for ip_config in ip_configs:
+        try:
+            ip_with_netmask = _stringlist_to_dictionary(ip_config).get("ip")
+            ip = ip_interface(ip_with_netmask).ip
 
-    # Determine which settings can be reconfigured.
-    query_path = "nodes/{}/qemu/{}/config"
-    valid_settings = set(_get_properties(query_path.format("{node}", "{vmid}"), "POST"))
-
-    log.info("Configuring cloned VM")
-
-    # Modify the settings for the VM one at a time so we can see any problems with the values
-    # as quickly as possible
-    for setting in vm_:
-        postParams = None
-        if setting == "vmid":
-            pass  # vmid gets passed in the URL and can't be reconfigured
-        elif re.match(r"^net(\d+)$", setting):
-            # net strings are a list of comma seperated settings. We need to merge the settings so that
-            # the setting in the profile only changes the settings it touches and the other settings
-            # are left alone. An example of why this is necessary is because the MAC address is set
-            # in here and generally you don't want to alter or have to know the MAC address of the new
-            # instance, but you may want to set the VLAN bridge
-            data = query("get", "nodes/{}/qemu/{}/config".format(vm_["host"], vmid))
-
-            # Generate a dictionary of settings from the existing string
-            new_setting = {}
-            if setting in data:
-                new_setting.update(_stringlist_to_dictionary(data[setting]))
-
-            # Merge the new settings (as a dictionary) into the existing dictionary to get the
-            # new merged settings
-            new_setting.update(_stringlist_to_dictionary(vm_[setting]))
-
-            # Convert the dictionary back into a string list
-            postParams = {setting: _dictionary_to_stringlist(new_setting)}
-
-        elif setting == "sshkeys":
-            postParams = {setting: urllib.parse.quote(vm_[setting], safe="")}
-        elif setting in valid_settings:
-            postParams = {setting: vm_[setting]}
-
-        if postParams:
-            query(
-                "post",
-                "nodes/{}/qemu/{}/config".format(vm_["host"], vmid),
-                postParams,
-            )
-
-
-def create(vm_):
-    """
-    Create a single VM from a data dict
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud -p proxmox-ubuntu vmhostname
-    """
-    try:
-        # Check for required profile parameters before sending any API calls.
-        if (
-            vm_["profile"]
-            and config.is_profile_configured(
-                __opts__,
-                _get_active_provider_name() or "proxmox",
-                vm_["profile"],
-                vm_=vm_,
-            )
-            is False
-        ):
-            return False
-    except AttributeError:
-        pass
-
-    ret = {}
-
-    __utils__["cloud.fire_event"](
-        "event",
-        "starting create",
-        "salt/cloud/{}/creating".format(vm_["name"]),
-        args=__utils__["cloud.filter_event"](
-            "creating", vm_, ["name", "profile", "provider", "driver"]
-        ),
-        sock_dir=__opts__["sock_dir"],
-        transport=__opts__["transport"],
-    )
-
-    log.info("Creating Cloud VM %s", vm_["name"])
-
-    if "use_dns" in vm_ and "ip_address" not in vm_:
-        use_dns = vm_["use_dns"]
-        if use_dns:
-            from socket import gaierror, gethostbyname
-
-            try:
-                ip_address = gethostbyname(str(vm_["name"]))
-            except gaierror:
-                log.debug("Resolving of %s failed", vm_["name"])
+            if ip.is_private:
+                private_ips.append(str(ip))
             else:
-                vm_["ip_address"] = str(ip_address)
-
-    try:
-        newid = _get_next_vmid()
-        data = create_node(vm_, newid)
-    except Exception as exc:  # pylint: disable=broad-except
-        msg = str(exc)
-        if isinstance(exc, requests.exceptions.RequestException) and exc.response is not None:
-            msg = msg + "\n" + exc.response.text
-        log.error(
-            "Error creating %s on PROXMOX\n\n"
-            "The following exception was thrown when trying to "
-            "run the initial deployment: \n%s",
-            vm_["name"],
-            msg,
-            # Show the traceback if the debug logging level is enabled
-            exc_info_on_loglevel=logging.DEBUG,
-        )
-        return False
-
-    ret["creation_data"] = data
-    name = vm_["name"]  # hostname which we know
-    vmid = data["vmid"]  # vmid which we have received
-    host = data["node"]  # host which we have received
-
-    agent_get_ip = vm_.get("agent_get_ip", False)
-
-    if agent_get_ip is False:
-        # Determine which IP to use in order of preference:
-        if "ip_address" in vm_:
-            ip_address = str(vm_["ip_address"])
-        elif "public_ips" in data:
-            ip_address = str(data["public_ips"][0])  # first IP
-        elif "private_ips" in data:
-            ip_address = str(data["private_ips"][0])  # first IP
-        else:
-            raise SaltCloudExecutionFailure("Could not determine an IP address to use")
-
-        log.debug("Using IP address %s", ip_address)
-
-    # wait until the vm has been created so we can start it
-    if not wait_for_created(data["upid"], timeout=300):
-        return {"Error": "Unable to create {}, command timed out".format(name)}
-
-    if vm_.get("clone") is True:
-        _reconfigure_clone(vm_, vmid)
-
-    # VM has been created. Starting..
-    if not start(name, vmid, call="action"):
-        log.error("Node %s (%s) failed to start!", name, vmid)
-        raise SaltCloudExecutionFailure
-
-    # Wait until the VM has fully started
-    log.debug('Waiting for state "running" for vm %s on %s', vmid, host)
-    if not wait_for_state(vmid, "running"):
-        return {"Error": "Unable to start {}, command timed out".format(name)}
-
-    if agent_get_ip is True:
-        try:
-            ip_address = salt.utils.cloud.wait_for_fun(_find_agent_ip, vm_=vm_, vmid=vmid)
-        except (SaltCloudExecutionTimeout, SaltCloudExecutionFailure) as exc:
-            try:
-                # If VM was created but we can't connect, destroy it.
-                destroy(vm_["name"])
-            except SaltCloudSystemExit:
-                pass
-            finally:
-                raise SaltCloudSystemExit(str(exc))
-
-        log.debug("Using IP address %s", ip_address)
-
-    ssh_username = config.get_cloud_config_value("ssh_username", vm_, __opts__, default="root")
-    ssh_password = config.get_cloud_config_value(
-        "password",
-        vm_,
-        __opts__,
-    )
-
-    ret["ip_address"] = ip_address
-    ret["username"] = ssh_username
-    ret["password"] = ssh_password
-
-    vm_["ssh_host"] = ip_address
-    vm_["password"] = ssh_password
-    ret = __utils__["cloud.bootstrap"](vm_, __opts__)
-
-    # Report success!
-    log.info("Created Cloud VM '%s'", vm_["name"])
-    log.debug("'%s' VM creation details:\n%s", vm_["name"], pprint.pformat(data))
-
-    __utils__["cloud.fire_event"](
-        "event",
-        "created instance",
-        "salt/cloud/{}/created".format(vm_["name"]),
-        args=__utils__["cloud.filter_event"](
-            "created", vm_, ["name", "profile", "provider", "driver"]
-        ),
-        sock_dir=__opts__["sock_dir"],
-    )
-
-    return ret
-
-
-def preferred_ip(vm_, ips):
-    """
-    Return either an 'ipv4' (default) or 'ipv6' address depending on 'protocol' option.
-    The list of 'ipv4' IPs is filtered by ignore_cidr() to remove any unreachable private addresses.
-    """
-    proto = config.get_cloud_config_value(
-        "protocol", vm_, __opts__, default="ipv4", search_global=False
-    )
-
-    family = socket.AF_INET
-    if proto == "ipv6":
-        family = socket.AF_INET6
-    for ip in ips:
-        ignore_ip = ignore_cidr(vm_, ip)
-        if ignore_ip:
-            continue
-        try:
-            socket.inet_pton(family, ip)
-            return ip
-        except Exception:  # pylint: disable=broad-except
-            continue
-    return False
-
-
-def ignore_cidr(vm_, ip):
-    """
-    Return True if we are to ignore the specified IP.
-    """
-
-    cidrs = config.get_cloud_config_value(
-        "ignore_cidr", vm_, __opts__, default=[], search_global=False
-    )
-    if cidrs and isinstance(cidrs, str):
-        cidrs = [cidrs]
-    for cidr in cidrs or []:
-        if ip_address(ip) in ip_network(cidr):
-            log.warning("IP %r found within %r; ignoring it.", ip, cidr)
-            return True
-
-    return False
-
-
-def _find_agent_ip(vm_, vmid):
-    """
-    If VM is started we would return the IP-addresses that are returned by the qemu agent on the VM.
-    """
-
-    # This functionality is only available on qemu
-    if not vm_.get("technology") == "qemu":
-        log.warning("Find agent IP is only available under `qemu`")
-        return
-
-    # Create an empty list of IP-addresses:
-    ips = []
-
-    endpoint = "nodes/{}/qemu/{}/agent/network-get-interfaces".format(vm_["host"], vmid)
-    interfaces = query("get", endpoint)
-
-    # If we get a result from the agent, parse it
-    for interface in interfaces["result"]:
-
-        # Skip interface if hardware-address is 00:00:00:00:00:00 (loopback interface)
-        if str(interface.get("hardware-address")) == "00:00:00:00:00:00":
-            continue
-
-        # Skip entries without ip-addresses information
-        if "ip-addresses" not in interface:
-            continue
-
-        for if_addr in interface["ip-addresses"]:
-            ip_addr = if_addr.get("ip-address")
-            if ip_addr is not None:
-                ips.append(str(ip_addr))
-
-    if len(ips) > 0:
-        return preferred_ip(vm_, ips)
-
-    raise SaltCloudExecutionFailure
-
-
-def _import_api():
-    """
-    Download https://<url>/pve-docs/api-viewer/apidoc.js
-    Extract content of pveapi var (json formatted)
-    Load this json content into global variable "api"
-    """
-    global api
-    url = "{}/pve-docs/api-viewer/apidoc.js".format(_get_url())
-    returned_data = requests.get(url, verify=verify_ssl)
-
-    re_filter = re.compile(" (?:pveapi|apiSchema) = (.*)^;", re.DOTALL | re.MULTILINE)
-    api_json = re_filter.findall(returned_data.text)[0]
-    api = salt.utils.json.loads(api_json)
-
-
-def _get_properties(path="", method="GET"):
-    """
-    Return the parameter list from api for defined path and HTTP method
-    """
-    if api is None:
-        _import_api()
-
-    sub = api
-    path_levels = [level for level in path.split("/") if level != ""]
-    search_path = ""
-    props = []
-    parameters = set()
-    # Browse all path elements but last
-    for elem in path_levels[:-1]:
-        search_path += "/" + elem
-        # Lookup for a dictionary with path = "requested path" in list" and return its children
-        sub = next(item for item in sub if item["path"] == search_path)["children"]
-    # Get leaf element in path
-    search_path += "/" + path_levels[-1]
-    sub = next(item for item in sub if item["path"] == search_path)
-    try:
-        # get list of properties for requested method
-        props = sub["info"][method]["parameters"]["properties"].keys()
-    except KeyError as exc:
-        log.error('method not found: "%s"', exc)
-    for prop in props:
-        numerical = re.match(r"(\w+)\[n\]", prop)
-        # generate (arbitrarily) 10 properties for duplicatable properties identified by:
-        # "prop[n]"
-        if numerical:
-            for i in range(10):
-                parameters.add(numerical.group(1) + str(i))
-        else:
-            parameters.add(prop)
-    return parameters
-
-
-def create_node(vm_, newid):
-    """
-    Build and submit the requestdata to create a new node
-    """
-    newnode = {}
-
-    if "technology" not in vm_:
-        vm_["technology"] = "lxc"  # default virt tech if none is given
-
-    if vm_["technology"] not in ["qemu", "lxc"]:
-        # Wrong VM type given
-        log.error("Wrong VM type. Valid options are: qemu or lxc")
-        raise SaltCloudExecutionFailure
-
-    if "host" not in vm_:
-        # Use globally configured/default location
-        vm_["host"] = config.get_cloud_config_value(
-            "default_host", get_configured_provider(), __opts__, search_global=False
-        )
-
-    if vm_["host"] is None:
-        # No location given for the profile
-        log.error("No host given to create this VM on")
-        raise SaltCloudExecutionFailure
-
-    # Required parameters
-    vmhost = vm_["host"]
-    newnode["vmid"] = newid
-
-    for prop in "cpuunits", "description", "memory", "onboot":
-        if prop in vm_:  # if the property is set, use it for the VM request
-            newnode[prop] = vm_[prop]
-
-    if vm_["technology"] == "lxc":
-        # LXC related settings, using non-default names:
-        newnode["hostname"] = vm_["name"]
-        newnode["ostemplate"] = vm_["image"]
-
-        for prop in _get_properties("/nodes/{node}/lxc", "POST"):
-            if prop in vm_:  # if the property is set, use it for the VM request
-                newnode[prop] = vm_[prop]
-
-        if "pubkey" in vm_:
-            newnode["ssh-public-keys"] = vm_["pubkey"]
-
-        # inform user the "disk" option is not supported for LXC hosts
-        if "disk" in vm_:
-            log.warning('The "disk" option is not supported for LXC hosts and was ignored')
-
-        # LXC specific network config
-        # OpenVZ allowed specifying IP and gateway. To ease migration from
-        # Proxmox 3, I've mapped the ip_address and gw to a generic net0 config.
-        # If you need more control, please use the net0 option directly.
-        # This also assumes a /24 subnet.
-        if "ip_address" in vm_ and "net0" not in vm_:
-            newnode["net0"] = "bridge=vmbr0,ip=" + vm_["ip_address"] + "/24,name=eth0,type=veth"
-
-            # gateway is optional and does not assume a default
-            if "gw" in vm_:
-                newnode["net0"] = newnode["net0"] + ",gw=" + vm_["gw"]
-
-    elif vm_["technology"] == "qemu":
-        for prop in _get_properties("/nodes/{node}/qemu", "POST"):
-            if prop in vm_:  # if the property is set, use it for the VM request
-                newnode[prop] = vm_[prop]
-
-    # The node is ready. Lets request it to be added
-    __utils__["cloud.fire_event"](
-        "event",
-        "requesting instance",
-        "salt/cloud/{}/requesting".format(vm_["name"]),
-        args={
-            "kwargs": __utils__["cloud.filter_event"]("requesting", newnode, list(newnode)),
-        },
-        sock_dir=__opts__["sock_dir"],
-    )
-
-    log.debug("Preparing to generate a node using these parameters: %s ", newnode)
-    if "clone" in vm_ and vm_["clone"] is True and vm_["technology"] == "qemu":
-        postParams = {}
-        postParams["newid"] = newnode["vmid"]
-        if "pool" in vm_:
-            postParams["pool"] = vm_["pool"]
-
-        for prop in "description", "format", "full", "name":
-            if "clone_" + prop in vm_:  # if the property is set, use it for the VM request
-                postParams[prop] = vm_["clone_" + prop]
-
-        try:
-            int(vm_["clone_from"])
+                public_ips.append(str(ip))
         except ValueError:
-            if ":" in vm_["clone_from"]:
-                vmhost = vm_["clone_from"].split(":")[0]
-                vm_["clone_from"] = vm_["clone_from"].split(":")[1]
+            log.error("Ignoring '%s' because it is not a valid IP", ip_with_netmask)
 
-        node = query(
-            "post",
-            "nodes/{}/qemu/{}/clone".format(vmhost, vm_["clone_from"]),
-            postParams,
-        )
-    else:
-        node = query("post", "nodes/{}/{}".format(vmhost, vm_["technology"]), newnode)
-    result = _parse_proxmox_upid(node, vm_)
-
-    # When cloning, the upid contains the clone_from vmid instead of the new vmid
-    result["vmid"] = newnode["vmid"]
-
-    return result
-
-
-def show_instance(name, call=None):
-    """
-    Show the details from Proxmox concerning an instance
-    """
-    if call != "action":
-        raise SaltCloudSystemExit("The show_instance action must be called with -a or --action.")
-
-    nodes = list_nodes_full()
-    __utils__["cloud.cache_node"](nodes[name], _get_active_provider_name(), __opts__)
-    return nodes[name]
-
-
-def get_vmconfig(vmid, node=None, node_type="lxc"):
-    """
-    Get VM configuration
-    """
-    if node is None:
-        # We need to figure out which node this VM is on.
-        for host_name, host_details in avail_locations().items():
-            for item in query("get", "nodes/{}/{}".format(host_name, node_type)):
-                if item["vmid"] == vmid:
-                    node = host_name
-
-    # If we reached this point, we have all the information we need
-    data = query("get", "nodes/{}/{}/{}/config".format(node, node_type, vmid))
-
-    return data
-
-
-def wait_for_created(upid, timeout=300):
-    """
-    Wait until a the vm has been created successfully
-    """
-    start_time = time.time()
-    info = _lookup_proxmox_task(upid)
-    if not info:
-        log.error("wait_for_created: No task information retrieved based on given criteria.")
-        raise SaltCloudExecutionFailure
-
-    while True:
-        if "status" in info and info["status"] == "OK":
-            log.debug("Host has been created!")
-            return True
-        time.sleep(3)  # Little more patience, we're not in a hurry
-        if time.time() - start_time > timeout:
-            log.debug("Timeout reached while waiting for host to be created")
-            return False
-        info = _lookup_proxmox_task(upid)
-
-
-def wait_for_state(vmid, state, timeout=300):
-    """
-    Wait until a specific state has been reached on a node
-    """
-    start_time = time.time()
-    node = get_vm_status(vmid=vmid)
-    if not node:
-        log.error("wait_for_state: No VM retrieved based on given criteria.")
-        raise SaltCloudExecutionFailure
-
-    while True:
-        if node["status"] == state:
-            log.debug('Host %s is now in "%s" state!', node["name"], state)
-            return True
-        time.sleep(1)
-        if time.time() - start_time > timeout:
-            log.debug("Timeout reached while waiting for %s to become %s", node["name"], state)
-            return False
-        node = get_vm_status(vmid=vmid)
-        log.debug('State for %s is: "%s" instead of "%s"', node["name"], node["status"], state)
-
-
-def destroy(name, call=None):
-    """
-    Destroy a node.
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud --destroy mymachine
-    """
-    if call == "function":
-        raise SaltCloudSystemExit(
-            "The destroy action must be called with -d, --destroy, -a or --action."
-        )
-
-    __utils__["cloud.fire_event"](
-        "event",
-        "destroying instance",
-        "salt/cloud/{}/destroying".format(name),
-        args={"name": name},
-        sock_dir=__opts__["sock_dir"],
-        transport=__opts__["transport"],
-    )
-
-    vmobj = _get_vm_by_name(name)
-    if vmobj is not None:
-        # stop the vm
-        if get_vm_status(vmid=vmobj["vmid"])["status"] != "stopped":
-            stop(name, vmobj["vmid"], "action")
-
-        # wait until stopped
-        if not wait_for_state(vmobj["vmid"], "stopped"):
-            return {"Error": "Unable to stop {}, command timed out".format(name)}
-
-        # required to wait a bit here, otherwise the VM is sometimes
-        # still locked and destroy fails.
-        time.sleep(3)
-
-        query("delete", "nodes/{}/{}".format(vmobj["node"], vmobj["id"]))
-        __utils__["cloud.fire_event"](
-            "event",
-            "destroyed instance",
-            "salt/cloud/{}/destroyed".format(name),
-            args={"name": name},
-            sock_dir=__opts__["sock_dir"],
-            transport=__opts__["transport"],
-        )
-        if __opts__.get("update_cachedir", False) is True:
-            __utils__["cloud.delete_minion_cachedir"](
-                name, _get_active_provider_name().split(":")[0], __opts__
-            )
-
-        return {"Destroyed": "{} was destroyed.".format(name)}
-
-
-def set_vm_status(status, name=None, vmid=None):
-    """
-    Convenience function for setting VM status
-    """
-    log.debug("Set status to %s for %s (%s)", status, name, vmid)
-
-    if vmid is not None:
-        log.debug("set_vm_status: via ID - VMID %s (%s): %s", vmid, name, status)
-        vmobj = _get_vm_by_id(vmid)
-    else:
-        log.debug("set_vm_status: via name - VMID %s (%s): %s", vmid, name, status)
-        vmobj = _get_vm_by_name(name)
-
-    if not vmobj or "node" not in vmobj or "type" not in vmobj or "vmid" not in vmobj:
-        log.error("Unable to set status %s for %s (%s)", status, name, vmid)
-        raise SaltCloudExecutionTimeout
-
-    log.debug("VM_STATUS: Has desired info (%s). Setting status..", vmobj)
-    data = query(
-        "post",
-        "nodes/{}/{}/{}/status/{}".format(vmobj["node"], vmobj["type"], vmobj["vmid"], status),
-    )
-
-    result = _parse_proxmox_upid(data, vmobj)
-
-    if result is not False and result is not None:
-        log.debug("Set_vm_status action result: %s", result)
-        return True
-
-    return False
-
-
-def get_vm_status(vmid=None, name=None):
-    """
-    Get the status for a VM, either via the ID or the hostname
-    """
-    if vmid is not None:
-        log.debug("get_vm_status: VMID %s", vmid)
-        vmobj = _get_vm_by_id(vmid)
-    elif name is not None:
-        log.debug("get_vm_status: name %s", name)
-        vmobj = _get_vm_by_name(name)
-    else:
-        log.debug("get_vm_status: No ID or NAME given")
-        raise SaltCloudExecutionFailure
-
-    log.debug("VM found: %s", vmobj)
-
-    if vmobj is not None and "node" in vmobj:
-        log.debug("VM_STATUS: Has desired info. Retrieving.. (%s)", vmobj["name"])
-        data = query(
-            "get",
-            "nodes/{}/{}/{}/status/current".format(vmobj["node"], vmobj["type"], vmobj["vmid"]),
-        )
-        return data
-
-    log.error("VM or requested status not found..")
-    return False
-
-
-def start(name, vmid=None, call=None):
-    """
-    Start a node.
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud -a start mymachine
-    """
-    if call != "action":
-        raise SaltCloudSystemExit("The start action must be called with -a or --action.")
-
-    log.debug("Start: %s (%s) = Start", name, vmid)
-    if not set_vm_status("start", name, vmid=vmid):
-        log.error("Unable to bring VM %s (%s) up..", name, vmid)
-        raise SaltCloudExecutionFailure
-
-    # xxx: TBD: Check here whether the status was actually changed to 'started'
-
-    return {"Started": "{} was started.".format(name)}
-
-
-def stop(name, vmid=None, call=None):
-    """
-    Stop a node ("pulling the plug").
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud -a stop mymachine
-    """
-    if call != "action":
-        raise SaltCloudSystemExit("The stop action must be called with -a or --action.")
-
-    if not set_vm_status("stop", name, vmid=vmid):
-        log.error("Unable to bring VM %s (%s) down..", name, vmid)
-        raise SaltCloudExecutionFailure
-
-    # xxx: TBD: Check here whether the status was actually changed to 'stopped'
-
-    return {"Stopped": "{} was stopped.".format(name)}
-
-
-def shutdown(name=None, vmid=None, call=None):
-    """
-    Shutdown a node via ACPI.
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud -a shutdown mymachine
-    """
-    if call != "action":
-        raise SaltCloudSystemExit("The shutdown action must be called with -a or --action.")
-
-    if not set_vm_status("shutdown", name, vmid=vmid):
-        log.error("Unable to shut VM %s (%s) down..", name, vmid)
-        raise SaltCloudExecutionFailure
-
-    # xxx: TBD: Check here whether the status was actually changed to 'stopped'
-
-    return {"Shutdown": "{} was shutdown.".format(name)}
+    return private_ips, public_ips
