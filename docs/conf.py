@@ -75,6 +75,7 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx_copybutton",
     "sphinxcontrib.spelling",
+    "sphinx_toolbox.collapse",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
