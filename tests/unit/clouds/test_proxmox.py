@@ -41,7 +41,7 @@ def configure_loader_modules():
 @patch(_fqn(proxmox._query))
 def test_create(mock__query: MagicMock, mock_show_instance: MagicMock):
     """
-    Tests that `create()` is calling the correct endpoint with the correct arguments
+    Test that `create()` is calling the correct endpoint with the correct arguments
     """
     create_config = {
         "name": "my-vm",
@@ -60,7 +60,7 @@ def test_create(mock__query: MagicMock, mock_show_instance: MagicMock):
 @patch(_fqn(proxmox.clone))
 def test_create_with_clone(mock_clone: MagicMock, mock_show_instance: MagicMock):
     """
-    Tests that `create()` is using the `clone()` function when the config specifies cloning
+    Test that `create()` is using the `clone()` function when the config specifies cloning
     """
     clone_config = {
         "name": "my-vm",
@@ -72,7 +72,6 @@ def test_create_with_clone(mock_clone: MagicMock, mock_show_instance: MagicMock)
         },
     }
 
-    # CASE 2: create new vm by cloning
     proxmox.create(clone_config)
     mock_clone.assert_called()
 
@@ -100,36 +99,56 @@ def test_avail_locations(mock__query: MagicMock):
 @patch(_fqn(proxmox._query))
 def test_avail_images(mock__query: MagicMock, mock_avail_locations: MagicMock):
     """
-    Test avail_images with different values for location parameter
+    Test that avail_images returns images in the correct data structure
     """
     mock_avail_locations.return_value = {"node1": {}}
     mock__query.return_value = [
         {
-            "volid": "local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst",
+            "volid": "other_storage:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst",
             "content": "vztmpl",
             "size": 129824858,
         },
     ]
 
-    # CASE 1: not setting storage should default to "local"
     result = proxmox.avail_images(call="function")
-    mock__query.assert_called_with("GET", "nodes/{}/storage/{}/content".format("node1", "local"))
     assert result == {
         "node1": {
-            "local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst": {
-                "volid": "local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst",
+            "other_storage:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst": {
+                "volid": "other_storage:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst",
                 "content": "vztmpl",
                 "size": 129824858,
             }
         }
     }
 
-    # CASE 2: setting storage should query that storage
+
+@patch(_fqn(proxmox.avail_locations))
+@patch(_fqn(proxmox._query))
+def test_avail_images_when_storage_given(mock__query: MagicMock, mock_avail_locations: MagicMock):
+    """
+    Test that avail_images queries given storage
+    """
+    mock_avail_locations.return_value = {"node1": {}}
+
     kwargs = {"storage": "other_storage"}
     proxmox.avail_images(call="function", kwargs=kwargs)
     mock__query.assert_called_with(
         "GET", "nodes/{}/storage/{}/content".format("node1", kwargs["storage"])
     )
+
+
+@patch(_fqn(proxmox.avail_locations))
+@patch(_fqn(proxmox._query))
+def test_avail_images_when_no_storage_given(
+    mock__query: MagicMock, mock_avail_locations: MagicMock
+):
+    """
+    Test that avail_images queries storage "local" when not specifying a storage
+    """
+    mock_avail_locations.return_value = {"node1": {}}
+
+    proxmox.avail_images(call="function")
+    mock__query.assert_called_with("GET", "nodes/{}/storage/{}/content".format("node1", "local"))
 
 
 @patch(_fqn(proxmox._get_url))
@@ -177,56 +196,83 @@ def test__get_vm_by_name(mock__query: MagicMock):
     assert result["vmid"] == 100
 
 
-def test__parse_ips():
+@patch(_fqn(proxmox._query))
+def test__get_vm_by_name_when(mock__query: MagicMock):
+    mock__query.return_value = [
+        {"vmid": 100, "name": "duplicate name vm"},
+        {"vmid": 200, "name": "duplicate name vm"},
+    ]
+
+    result = proxmox._get_vm_by_name("duplicate name vm")
+    assert result["vmid"] == 100
+
+
+def test__parse_ips_when_qemu_config():
     qemu_config = {
         "ipconfig0": "ip=192.168.1.10/24,gw=192.168.1.1",
         "ipconfig1": "ip=200.200.200.200/24,gw=200.200.200.1",
     }
 
+    private_ips, public_ips = proxmox._parse_ips(qemu_config, "qemu")
+    assert private_ips == ["192.168.1.10"]
+    assert public_ips == ["200.200.200.200"]
+
+
+def test__parse_ips_when_lxc_config():
     lxc_config = {
         "net0": "name=eth0,bridge=vmbr0,hwaddr=BA:F9:3B:F7:9E:A7,ip=192.168.1.10/24,type=veth",
         "net1": "name=eth1,bridge=vmbr0,hwaddr=B2:4B:C6:39:1D:10,ip=200.200.200.200/24,type=veth",
     }
 
-    invalid_ip_config = {
-        "net0": "name=eth0,bridge=vmbr0,hwaddr=BA:F9:3B:F7:9E:A7,ip=192.168.500.2/24,type=veth",
-    }
-
-    # CASE 1: parse ips from qemu config
-    private_ips, public_ips = proxmox._parse_ips(qemu_config, "qemu")
-    assert private_ips == ["192.168.1.10"]
-    assert public_ips == ["200.200.200.200"]
-
-    # CASE 2: parse ips from lxc config
     private_ips, public_ips = proxmox._parse_ips(lxc_config, "lxc")
     assert private_ips == ["192.168.1.10"]
     assert public_ips == ["200.200.200.200"]
 
-    # CASE 3: invalid ip in config
-    private_ips, public_ips = proxmox._parse_ips(invalid_ip_config, "lxc")
-    assert not private_ips
-    assert not public_ips
 
-    # CASE 4: no ips in config
+def test__parse_ips_when_empty_config():
     private_ips, public_ips = proxmox._parse_ips({}, "lxc")
     assert not private_ips
     assert not public_ips
 
 
-def test__stringlist_to_dictionary():
-    # CASE 1: empty stringlist should return empty dict
-    result = proxmox._stringlist_to_dictionary("")
-    assert result == dict()
+def test__parse_ips_when_invalid_config():
+    invalid_ip_config = {
+        "net0": "name=eth0,bridge=vmbr0,hwaddr=BA:F9:3B:F7:9E:A7,ip=192.168.500.2/24,type=veth",
+    }
 
-    # CASE 2: stringlist should return dict
+    private_ips, public_ips = proxmox._parse_ips(invalid_ip_config, "lxc")
+    assert not private_ips
+    assert not public_ips
+
+
+def test__stringlist_to_dictionary():
+    """
+    Test that a valid stringlist returns a valid dict
+    """
     result = proxmox._stringlist_to_dictionary("foo=bar,some_key=some_value")
     assert result == {"foo": "bar", "some_key": "some_value"}
 
-    # CASE 3: spaces before and after "key=value" should be removed
+
+def test__stringlist_to_dictionary_when_empty():
+    """
+    Test that an empty stringlist returns an empty dict
+    """
+    result = proxmox._stringlist_to_dictionary("")
+    assert result == dict()
+
+
+def test__stringlist_to_dictionary_when_containing_leading_or_trailing_spaces():
+    """
+    Test that spaces before and after "key=value" are removed
+    """
     result = proxmox._stringlist_to_dictionary("foo=bar, space_before=bar,space_after=bar ")
     assert result == {"foo": "bar", "space_before": "bar", "space_after": "bar"}
 
-    # CASE 4: spaces in key or value should persist
+
+def test__stringlist_to_dictionary_when_containing_spaces():
+    """
+    Test that spaces in key or value persist
+    """
     result = proxmox._stringlist_to_dictionary(
         "foo=bar,internal key space=bar,space_in_value= internal value space"
     )
@@ -236,8 +282,13 @@ def test__stringlist_to_dictionary():
         "space_in_value": " internal value space",
     }
 
-    # Negative cases
-    pytest.raises(ValueError, proxmox._stringlist_to_dictionary, "foo=bar,foo")
-    pytest.raises(
-        ValueError, proxmox._stringlist_to_dictionary, "foo=bar,totally=invalid=assignment"
-    )
+
+def test__stringlist_to_dictionary_when_invalid():
+    """
+    Test that invalid stringlists raise errors
+    """
+    with pytest.raises(ValueError):
+        proxmox._stringlist_to_dictionary("foo=bar,foo")
+
+    with pytest.raises(ValueError):
+        proxmox._stringlist_to_dictionary("foo=bar,totally=invalid=assignment")
