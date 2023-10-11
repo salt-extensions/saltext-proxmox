@@ -729,7 +729,7 @@ def _wait_for_vm_status(name, status, timeout=300, interval=0.2):
         The timeout in seconds on how long to wait for the task. Default: 300 seconds
 
     interval
-        The interval in seconds at which the API should be queried for updates. Default: .2 seconds
+        The interval in seconds at which the API should be queried for updates. Default: 0.2 seconds
     """
     vm = _get_vm_by_name(name)
 
