@@ -490,9 +490,9 @@ def show_instance(call=None, name=None):
     if call != "action":
         raise SaltCloudSystemExit("The show_instance action must be called with -a or --action.")
 
-    for vm in list_nodes_full():
-        if vm["name"] == name:
-            return vm
+    for k, v in list_nodes_full().items():
+        if k == name:
+            return v
 
     raise SaltCloudNotFound(f"The specified VM named '{name}' could not be found.")
 
