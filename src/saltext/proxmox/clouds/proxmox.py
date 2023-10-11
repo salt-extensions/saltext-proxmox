@@ -393,8 +393,8 @@ def avail_images(call=None, kwargs=None):
 
     ret = {}
     for location in avail_locations():
+        ret[location] = {}
         for item in _query("GET", f"nodes/{location}/storage/{storage}/content"):
-            ret[location] = {}
             ret[location][item["volid"]] = item
             # TODO: filter to actual images. what is an imagetype? images, vztmpl, iso
 
@@ -617,6 +617,8 @@ def _query(method, path, data=None):
     }
 
     try:
+        response = None
+
         if method == "GET":
             response = requests.get(
                 url=url,

@@ -196,6 +196,11 @@ def test_avail_images(mock__query: MagicMock, mock_avail_locations: MagicMock):
     mock_avail_locations.return_value = {"node1": {}}
     mock__query.return_value = [
         {
+            "volid": "other_storage:vztmpl/ubuntu-20.04-standard_20.04-1_amd64.tar.zst",
+            "content": "vztmpl",
+            "size": 129824858,
+        },
+        {
             "volid": "other_storage:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst",
             "content": "vztmpl",
             "size": 129824858,
@@ -205,11 +210,16 @@ def test_avail_images(mock__query: MagicMock, mock_avail_locations: MagicMock):
     result = proxmox.avail_images(call="function")
     assert result == {
         "node1": {
+            "other_storage:vztmpl/ubuntu-20.04-standard_20.04-1_amd64.tar.zst": {
+                "volid": "other_storage:vztmpl/ubuntu-20.04-standard_20.04-1_amd64.tar.zst",
+                "content": "vztmpl",
+                "size": 129824858,
+            },
             "other_storage:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst": {
                 "volid": "other_storage:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst",
                 "content": "vztmpl",
                 "size": 129824858,
-            }
+            },
         }
     }
 
