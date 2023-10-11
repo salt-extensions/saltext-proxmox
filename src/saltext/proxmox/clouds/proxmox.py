@@ -420,6 +420,8 @@ def list_nodes(call=None):
     ret = {}
     for vm in vms:
         name = vm["name"]
+
+        ret[name] = {}
         ret[name]["id"] = str(vm["vmid"])
         ret[name]["image"] = ""  # proxmox does not carry that information
         ret[name]["size"] = ""  # proxmox does not have VM sizes like AWS (e.g: t2-small)
