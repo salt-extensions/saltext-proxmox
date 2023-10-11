@@ -293,7 +293,7 @@ def reconfigure(call=None, name=None, kwargs=None):
     }
 
 
-def destroy(call=None, name=None):
+def destroy(call=None, name=None, kwargs=None):
     """
     Destroy a Proxmox VM by name
 
@@ -322,7 +322,7 @@ def destroy(call=None, name=None):
 
     vm = _get_vm_by_name(name)
 
-    _query("DELETE", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}")
+    _query("DELETE", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}", kwargs)
 
     __utils__["cloud.fire_event"](
         "event",
