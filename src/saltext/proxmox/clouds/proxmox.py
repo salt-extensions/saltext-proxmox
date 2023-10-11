@@ -682,19 +682,19 @@ def _get_vm_by_name(name):
     raise SaltCloudNotFound(f"The specified VM with name '{name}' could not be found.")
 
 
-def _get_vm_by_id(vm_vmid):
+def _get_vm_by_id(vmid):
     """
     Return VM identified by vmid.
 
-    vm_vmid
+    vmid
         The vmid of the VM. Required.
     """
     vms = _query("GET", "cluster/resources", {"type": "vm"})
     for vm in vms:
-        if vm["vmid"] == vm_vmid:
+        if vm["vmid"] == vmid:
             return vm
 
-    raise SaltCloudNotFound(f"The specified VM with vmid '{vm_vmid}' could not be found.")
+    raise SaltCloudNotFound(f"The specified VM with vmid '{vmid}' could not be found.")
 
 
 def _set_vm_status(name, status, kwargs=None):
