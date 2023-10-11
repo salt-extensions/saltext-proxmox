@@ -620,7 +620,6 @@ def _query(method, path, data=None):
         if method == "GET":
             response = requests.get(
                 url=url,
-                # verify=verify_ssl,
                 headers=headers,
                 params=data,
             )
@@ -629,7 +628,6 @@ def _query(method, path, data=None):
             response = requests.request(
                 method=method,
                 url=url,
-                # verify=verify_ssl,
                 headers=headers,
                 data=data,
             )
@@ -662,10 +660,6 @@ def _get_api_token():
     token = config.get_cloud_config_value(
         "token", get_configured_provider(), __opts__, search_global=False
     )
-    # not sure we should actually support this as it's insecure
-    # verify_ssl = config.get_cloud_config_value(
-    #     "token", get_configured_provider(), __opts__, search_global=False
-    # )
     return f"{username}!{token}"
 
 
