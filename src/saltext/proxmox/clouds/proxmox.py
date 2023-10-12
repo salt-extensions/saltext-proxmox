@@ -219,7 +219,7 @@ def create(vm_):
     return ret
 
 
-def clone(call=None, kwargs=None):
+def clone(kwargs=None, call=None):
     """
     Clone a VM
 
@@ -260,7 +260,7 @@ def clone(call=None, kwargs=None):
     # raise SaltCloudExecutionTimeout("Timeout to wait for VM cloning reached")
 
 
-def reconfigure(call=None, name=None, kwargs=None):
+def reconfigure(name=None, kwargs=None, call=None):
     """
     Reconfigure a Proxmox VM
 
@@ -293,7 +293,7 @@ def reconfigure(call=None, name=None, kwargs=None):
     }
 
 
-def destroy(call=None, name=None, kwargs=None):
+def destroy(name=None, kwargs=None, call=None):
     """
     Destroy a Proxmox VM by name
 
@@ -363,7 +363,7 @@ def avail_locations(call=None):
     return ret
 
 
-def avail_images(call=None, kwargs=None):
+def avail_images(kwargs=None, call=None):
     """
     Return available Proxmox images
 
@@ -476,7 +476,7 @@ def list_nodes_select(call=None):
     )
 
 
-def show_instance(call=None, name=None):
+def show_instance(name=None, call=None):
     """
     Show the details from Proxmox concerning an instance
 
@@ -499,7 +499,7 @@ def show_instance(call=None, name=None):
     raise SaltCloudNotFound(f"The specified VM named '{name}' could not be found.")
 
 
-def start(call=None, name=None, kwargs=None):
+def start(name=None, kwargs=None, call=None):
     """
     Start a node.
 
@@ -533,7 +533,7 @@ def start(call=None, name=None, kwargs=None):
     }
 
 
-def stop(call=None, name=None, kwargs=None):
+def stop(name=None, kwargs=None, call=None):
     """
     Stop a node.
 
@@ -567,7 +567,7 @@ def stop(call=None, name=None, kwargs=None):
     }
 
 
-def shutdown(call=None, name=None, kwargs=None):
+def shutdown(name=None, kwargs=None, call=None):
     """
     Shutdown a node.
 
