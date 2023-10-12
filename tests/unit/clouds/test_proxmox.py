@@ -39,8 +39,9 @@ def configure_loader_modules():
 
 
 @patch(_fqn(proxmox.show_instance))
+@patch(_fqn(proxmox.start))
 @patch(_fqn(proxmox._query))
-def test_create(mock__query: MagicMock, mock_show_instance: MagicMock):
+def test_create(mock__query: MagicMock, mock_start: MagicMock, mock_show_instance: MagicMock):
     """
     Test that `create()` is calling the correct endpoint with the correct arguments
     """
@@ -58,8 +59,11 @@ def test_create(mock__query: MagicMock, mock_show_instance: MagicMock):
 
 
 @patch(_fqn(proxmox.show_instance))
+@patch(_fqn(proxmox.start))
 @patch(_fqn(proxmox.clone))
-def test_create_with_clone(mock_clone: MagicMock, mock_show_instance: MagicMock):
+def test_create_with_clone(
+    mock_clone: MagicMock, mock_start: MagicMock, mock_show_instance: MagicMock
+):
     """
     Test that `create()` is using the `clone()` function when the config specifies cloning
     """
