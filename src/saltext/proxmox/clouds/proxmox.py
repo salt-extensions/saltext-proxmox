@@ -32,12 +32,11 @@ Profile configuration examples:
             ssh_password: supersecret
 
             create:
-                # Required parameters
+                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc
                 vmid: 123
                 ostemplate:  local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
                 node: proxmox-node1
 
-                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc
                 net0: name=eth0,bridge=vmbr0,firewall=1,gw=192.168.101.1,ip=192.168.101.2/24,tag=101,type=veth
                 password: supersecret
 
@@ -55,12 +54,11 @@ Profile configuration examples:
             ssh_password: supersecret
 
             clone:
-                # Required parameters
+                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/clone
                 vmid: 123
                 newid: 456
                 node: proxmox-node1
 
-                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/clone
                 description: cloned vm
 
 .. collapse:: Create a new QEMU VM
@@ -77,11 +75,10 @@ Profile configuration examples:
             ssh_password: supersecret
 
             create:
-                # Required parameters
+                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu
                 vmid: 123
                 node: proxmox-node1
 
-                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu
                 ipconfig0: ip=192.168.101.2/24,gw=192.168.101.1
 
 .. collapse:: Clone an existing QEMU VM:
@@ -98,12 +95,11 @@ Profile configuration examples:
             ssh_password: supersecret
 
             clone:
-                # Required parameters
+                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/clone
                 vmid: 123
                 newid: 456
                 node: proxmox-node1
 
-                # For additional parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/clone
                 description: cloned vm
 
 :maintainer: Bernhard Gally <github.com/I3urny>
