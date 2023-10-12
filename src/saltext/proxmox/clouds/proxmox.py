@@ -281,9 +281,7 @@ def reconfigure(call=None, name=None, kwargs=None):
         salt-cloud -a reconfigure vm_name
     """
     if call == "function":
-        raise SaltCloudSystemExit(
-            "The reconfigure action must be called with -d, --destroy, -a or --action."
-        )
+        raise SaltCloudSystemExit("The reconfigure action must be called with -a or --action.")
 
     vm = _get_vm_by_name(name)
 
