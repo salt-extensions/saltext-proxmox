@@ -37,6 +37,7 @@ Profile configuration examples:
                 ostemplate:  local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
                 node: proxmox-node1
 
+                hostname: my-lxc-container
                 net0: name=eth0,bridge=vmbr0,firewall=1,gw=192.168.101.1,ip=192.168.101.2/24,tag=101,type=veth
                 password: supersecret
 
@@ -59,6 +60,7 @@ Profile configuration examples:
                 newid: 456
                 node: proxmox-node1
 
+                hostname: my-lxc-container
                 description: cloned vm
 
 .. collapse:: Create a new QEMU VM
@@ -79,6 +81,7 @@ Profile configuration examples:
                 vmid: 123
                 node: proxmox-node1
 
+                name: my-qemu-vm
                 ipconfig0: ip=192.168.101.2/24,gw=192.168.101.1
 
 .. collapse:: Clone an existing QEMU VM:
@@ -100,6 +103,7 @@ Profile configuration examples:
                 newid: 456
                 node: proxmox-node1
 
+                name: my-qemu-vm
                 description: cloned vm
 
 :maintainer: Bernhard Gally <github.com/I3urny>
