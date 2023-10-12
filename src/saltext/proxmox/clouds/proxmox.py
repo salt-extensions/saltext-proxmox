@@ -197,6 +197,8 @@ def create(vm_):
     else:
         _query("POST", f"nodes/{vm_['create']['node']}/{type}", vm_["create"])
 
+    start(call="action", name=vm_["name"])
+
     # cloud.bootstrap expects the ssh_password to be set in vm_["password"]
     vm_["password"] = vm_.get("ssh_password")
     ret = __utils__["cloud.bootstrap"](vm_, __opts__)
