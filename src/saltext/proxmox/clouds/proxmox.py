@@ -108,7 +108,7 @@ Profile configuration examples:
                 name: my-qemu-vm
                 description: cloned vm
 
-:maintainer: Bernhard Gally <github.com/I3urny>
+:maintainer: EITR Technologies, LLC <devops@eitr.tech>
 :depends: requests >= 2.2.1
 """
 import logging
