@@ -16,6 +16,8 @@ Set up the cloud configuration at ``/etc/salt/cloud.providers`` or
       url: https://hypervisor.domain.tld:8006
       driver: proxmox
 
+This cloud module is a wrapper for the Proxmox API. As such, all supported parameters for VM operations (create, clone, start, ...) by the Proxmox API are also supported through this cloud module.
+
 Profile configuration examples:
 
 .. collapse:: Create a new LXC container
