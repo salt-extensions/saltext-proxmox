@@ -9,8 +9,10 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import datetime
+import email.policy
 import os
 import sys
+from pathlib import Path
 
 try:
     from importlib_metadata import distribution
@@ -24,6 +26,8 @@ except NameError:
     # sphinx-intl and six execute some code which will raise this NameError
     # assume we're in the doc/ directory
     docs_basepath = os.path.abspath(os.path.dirname("."))
+
+PROJECT_ROOT_DIR = Path(docs_basepath).parent
 
 addtl_paths = (
     os.path.join(os.pardir, "src"),  # saltext.proxmox itself (for autodoc)
@@ -44,6 +48,19 @@ else:
     copyright_year = f"2021 - {this_year}"
 project = dist.metadata["Summary"]
 author = dist.metadata["Author"]
+
+if author is None:
+    # Core metadata is serialized differently with pyproject.toml:
+    # https://packaging.python.org/en/latest/specifications/pyproject-toml/#authors-maintainers
+    author_email = dist.metadata["Author-email"]
+    em = email.message_from_string(
+        f"To: {author_email}",
+        policy=email.policy.default,
+    )
+    if em["To"].addresses and em["To"].addresses[0]:
+        author = em["To"].addresses[0].display_name
+    author = author or ""
+
 copyright = f"{copyright_year}, {author}"
 
 # The full version, including alpha/beta/rc tags
@@ -75,7 +92,15 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx_copybutton",
     "sphinxcontrib.spelling",
-    "sphinx_toolbox.collapse",
+    "sphinxcontrib.towncrier.ext",
+    "myst_parser",
+    "sphinx_inline_tabs",
+]
+
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "tasklist",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -97,6 +122,8 @@ exclude_patterns = [
 ]
 
 autosummary_generate = False
+
+suppress_warnings = ["myst.header"]
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -137,7 +164,7 @@ napoleon_use_rtype = True
 # ----- Intersphinx Config ---------------------------------------------------------------------------------------->
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
-    "pytest": ("https://pytest.readthedocs.io/en/stable", None),
+    "pytest": ("https://docs.pytest.org/en/stable", None),
     "salt": ("https://docs.saltproject.io/en/latest", None),
 }
 # <---- Intersphinx Config -----------------------------------------------------------------------------------------
@@ -146,6 +173,11 @@ intersphinx_mapping = {
 autodoc_default_options = {"member-order": "bysource"}
 autodoc_mock_imports = ["salt"]
 # <---- Autodoc Config -----------------------------------------------------------------------------------------------
+
+# Towncrier draft config
+towncrier_draft_autoversion_mode = "sphinx-release"
+towncrier_draft_include_empty = True
+towncrier_draft_working_directory = str(PROJECT_ROOT_DIR)
 
 
 def setup(app):

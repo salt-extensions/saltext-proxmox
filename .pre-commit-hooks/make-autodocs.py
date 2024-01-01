@@ -1,60 +1,119 @@
+import ast
+import os.path
+import subprocess
 from pathlib import Path
 
 
-autodocs = {}
+repo_path = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode().strip())
+src_dir = repo_path / "src" / "saltext" / "proxmox"
+doc_dir = repo_path / "docs"
 
-loader_dirs = (
-    "engines",
-    "modules",
-    "returners",
-    "states",
-)
+docs_by_kind = {}
+changed_something = False
 
-for ldir in loader_dirs:
-    autodocs[ldir] = []
 
-trans = str.maketrans({"_": r"\_"})
-docs_path = Path("docs")
-ref_path = docs_path / "ref"
+def _find_virtualname(path):
+    tree = ast.parse(path.read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__virtualname__":
+                    if isinstance(node.value, ast.Str):
+                        virtualname = node.value.s
+                        break
+            else:
+                continue
+            break
+    else:
+        virtualname = path.with_suffix("").name
+    return virtualname
 
-for path in Path("src").glob("**/*.py"):
-    if path.name == "__init__.py":
-        continue
-    kind = path.parent.name
-    if kind in loader_dirs:
-        import_path = ".".join(path.with_suffix("").parts[1:])
-        autodocs[kind].append(import_path)
-        rst_path = ref_path / kind / (import_path + ".rst")
-        if rst_path.is_file():
-            continue
-        rst_path.parent.mkdir(parents=True, exist_ok=True)
-        rst_path.write_text(
-            f"""{import_path.translate(trans)}
-{'='*len(import_path.translate(trans))}
 
-.. currentmodule:: {'.'.join(import_path.split('.')[:-1])}
+def write_module(rst_path, path, use_virtualname=True):
+    if use_virtualname:
+        virtualname = "``" + _find_virtualname(path) + "``"
+    else:
+        virtualname = make_import_path(path)
+    module_contents = f"""\
+{virtualname}
+{'='*len(virtualname)}
 
-.. autodata:: {import_path.split('.')[-1]}"""
+.. automodule:: {make_import_path(path)}
+    :members:
+"""
+    if not rst_path.exists() or rst_path.read_text() != module_contents:
+        print(rst_path)
+        rst_path.write_text(module_contents)
+        return True
+    return False
+
+
+def write_index(index_rst, import_paths, kind):
+    if kind == "utils":
+        header_text = "Utilities"
+        common_path = os.path.commonpath(tuple(x.replace(".", "/") for x in import_paths)).replace(
+            "/", "."
         )
+        if any(x == common_path for x in import_paths):
+            common_path = common_path[: common_path.rfind(".")]
+    else:
+        header_text = (
+            "execution modules" if kind.lower() == "modules" else kind.rstrip("s") + " modules"
+        )
+        common_path = import_paths[0][: import_paths[0].rfind(".")]
+    header = f"{'_'*len(header_text)}\n{header_text.title()}\n{'_'*len(header_text)}"
+    index_contents = f"""\
+.. all-saltext.proxmox.{kind}:
 
-for ldir in autodocs:
-    if not autodocs[ldir]:
-        continue
-    all_rst = ref_path / ldir / "all.rst"
-    if all_rst.is_file():
-        continue
-    all_rst.parent.mkdir(parents=True, exist_ok=True)
-    all_rst.write_text(
-        f"""
-.. all-saltext.proxmox.{ldir}:
+{header}
 
-{'-'*len(ldir)}--------
-{ldir.title()} Modules
-{'-'*len(ldir)}--------
+.. currentmodule:: {common_path}
 
 .. autosummary::
     :toctree:
 
-{chr(10).join(sorted('    '+mod for mod in autodocs[ldir]))}
+{chr(10).join(sorted('    '+p[len(common_path)+1:] for p in import_paths))}
 """
-    )
+    if not index_rst.exists() or index_rst.read_text() != index_contents:
+        print(index_rst)
+        index_rst.write_text(index_contents)
+        return True
+    return False
+
+
+def make_import_path(path):
+    if path.name == "__init__.py":
+        path = path.parent
+    return ".".join(path.relative_to(repo_path / "src").with_suffix("").parts)
+
+
+for path in src_dir.glob("*/*.py"):
+    if path.name != "__init__.py":
+        kind = path.parent.name
+        if kind != "utils":
+            docs_by_kind.setdefault(kind, set()).add(path)
+
+# Utils can have subdirectories, treat them separately
+for path in (src_dir / "utils").rglob("*.py"):
+    if path.name == "__init__.py" and not path.read_text():
+        continue
+    docs_by_kind.setdefault("utils", set()).add(path)
+
+for kind in docs_by_kind:
+    kind_path = doc_dir / "ref" / kind
+    index_rst = kind_path / "index.rst"
+    import_paths = []
+    for path in sorted(docs_by_kind[kind]):
+        import_path = make_import_path(path)
+        import_paths.append(import_path)
+        rst_path = kind_path / (import_path + ".rst")
+        rst_path.parent.mkdir(parents=True, exist_ok=True)
+        change = write_module(rst_path, path, use_virtualname=kind != "utils")
+        changed_something = changed_something or change
+
+    write_index(index_rst, import_paths, kind)
+
+
+# Ensure pre-commit realizes we did something
+if changed_something:
+    exit(2)

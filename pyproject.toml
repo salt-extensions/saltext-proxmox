@@ -1,6 +1,105 @@
 [build-system]
-requires = ["setuptools>=58.3.0,<67.0.0", "wheel", "setuptools-declarative-requirements", "setuptools_scm[toml]>=3.4"]
+requires = [
+    "wheel",
+    "setuptools>=50.3.2",
+    "setuptools_scm[toml]>=3.4",
+]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/saltext/proxmox/version.py"
+write_to_template = "__version__ = \"{version}\""
+
+[project]
+name = "saltext.proxmox"
+description = "Salt Extension for interacting with Proxmox"
+authors = [
+    {name = "EITR Technologies, LLC", email = "devops@eitr.tech"},
+]
+keywords = [
+    "salt-extension",
+]
+license = {text = "Apache Software License"}
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Cython",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+]
+requires-python = ">= 3.8"
+dynamic = ["version"]
+dependencies = [
+    "requests>=2.2.1",
+    "salt>=3005",
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.urls]
+Homepage = "https://github.com/salt-extensions/saltext-proxmox"
+Source = "https://github.com/salt-extensions/saltext-proxmox"
+Tracker = "https://github.com/salt-extensions/saltext-proxmox/issues"
+
+[project.optional-dependencies]
+changelog = ["towncrier==22.12.0"]
+dev = [
+    "nox",
+    "pre-commit>=2.4.0",
+    "pylint",
+    "saltpylint",
+]
+docs = [
+  "sphinx",
+  "sphinx-prompt",
+  "sphinxcontrib-spelling",
+  "sphinx-copybutton",
+  "towncrier==22.12.0",
+  "sphinxcontrib-towncrier",
+  "myst_parser",
+  "furo",
+  "sphinx-inline-tabs",
+]
+docsauto = ["sphinx-autobuild"]
+lint = [
+    "pylint",
+    "saltpylint",
+]
+tests = [
+    "pytest>=6.1.0",
+    "pytest-salt-factories>=1.0.0rc19",
+]
+
+[project.entry-points."salt.loader"]
+"saltext.proxmox" = "saltext.proxmox"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+platforms = ["any"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests"]
+
+[tool.distutils.bdist_wheel]
+# Use this option if your package is pure-python
+universal = 1
+
+[tool.distutils.sdist]
+owner = "root"
+group = "root"
+
+[tool.build_sphinx]
+source_dir = "docs"
+build_dir = "build/sphinx"
 
 [tool.black]
 line-length = 100
@@ -8,8 +107,12 @@ line-length = 100
 [tool.towncrier]
     package = "saltext.proxmox"
     filename = "CHANGELOG.md"
+    template = "changelog/.template.jinja"
     directory = "changelog/"
     start_string = "# Changelog\n"
+    underlines = ["", "", ""]
+    title_format = "## {version} ({project_date})"
+    issue_format = "[#{issue}](https://github.com/salt-extensions/saltext-proxmox/issues/{issue})"
 
     [[tool.towncrier.type]]
         directory = "removed"

@@ -110,12 +110,6 @@ ENV/
 env.bak/
 venv.bak/
 
-# vscode
-.vscode/
-
-#salt env
-Saltfile
-
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -134,15 +128,17 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Ignore the setuptools_scm auto-generated version module
+src/saltext/proxmox/version.py
+
 # Ignore CI generated artifacts
 artifacts/
 
-# Just a dir for local whatever
-local/
-
+# IDE
+.vscode/
 .DS_Store
 .idea/
-src/.DS_Store
-src/saltext/.DS_Store
-.vscode/
 *.swp
+
+#salt env
+Saltfile
