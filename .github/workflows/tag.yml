@@ -1,0 +1,32 @@
+name: Tagged Releases
+
+on:
+  push:
+    tags:
+      - "v*"  # Only tags starting with "v" for "v1.0.0", etc.
+
+jobs:
+  get_tag_version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract tag name
+        id: get_version
+        run: echo "::set-output name=version::$(echo ${GITHUB_REF#refs/tags/v})"
+
+  call_central_workflow:
+    needs: get_tag_version
+    uses: salt-extensions/central-artifacts/.github/workflows/ci.yml@main
+    with:
+      setup-vault: true
+      release: true
+      version: ${{ needs.get_tag_version.outputs.version }}
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: read
+    secrets: inherit

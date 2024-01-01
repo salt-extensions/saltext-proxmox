@@ -16,6 +16,7 @@ import copy
 import errno
 import fnmatch
 import sys
+from unittest import mock
 from unittest.mock import ANY
 from unittest.mock import call
 from unittest.mock import create_autospec
@@ -38,6 +39,10 @@ import salt.utils.stringutils
 
 
 class MockFH:
+    """
+    MockFH class
+    """
+
     def __init__(self, filename, read_data, *args, **kwargs):
         self.filename = filename
         self.read_data = read_data
@@ -107,14 +112,12 @@ class MockFH:
             if self.binary_mode:
                 if not isinstance(self.read_data, bytes):
                     raise TypeError(
-                        "{} opened in binary mode, expected read_data to be "
-                        "bytes, not {}".format(self.filename, type(self.read_data).__name__)
+                        f"{self.filename} opened in binary mode, expected read_data to be bytes, not {type(self.read_data).__name__}"
                     )
             else:
                 if not isinstance(self.read_data, str):
                     raise TypeError(
-                        "{} opened in non-binary mode, expected read_data to "
-                        "be str, not {}".format(self.filename, type(self.read_data).__name__)
+                        f"{self.filename} opened in non-binary mode, expected read_data to be str, not {type(self.read_data).__name__}"
                     )
             # No need to repeat this the next time we check
             self.__read_data_ok = True
@@ -179,13 +182,9 @@ class MockFH:
         else:
             content_type = type(content)
             if self.binary_mode and content_type is not bytes:
-                raise TypeError(
-                    "a bytes-like object is required, not '{}'".format(content_type.__name__)
-                )
+                raise TypeError(f"a bytes-like object is required, not '{content_type.__name__}'")
             elif not self.binary_mode and content_type is not str:
-                raise TypeError(
-                    "write() argument must be str, not {}".format(content_type.__name__)
-                )
+                raise TypeError(f"write() argument must be str, not {content_type.__name__}")
 
     def _writelines(self, lines):
         if not self.write_mode:
@@ -201,6 +200,10 @@ class MockFH:
 
 
 class MockCall:
+    """
+    MockCall class
+    """
+
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
@@ -215,7 +218,7 @@ class MockCall:
                 ret = ret[:-2]
         else:
             for key, val in self.kwargs.items():
-                ret += "{}={}".format(salt.utils.stringutils.to_str(key), repr(val))
+                ret += f"{salt.utils.stringutils.to_str(key)}={repr(val)}"
         ret += ")"
         return ret
 
@@ -371,9 +374,8 @@ class MockOpen:
             except IndexError:
                 # We've run out of file contents, abort!
                 raise RuntimeError(
-                    "File matching expression '{}' opened more times than "
-                    "expected".format(matched_pattern)
-                )
+                    f"File matching expression '{matched_pattern}' opened more times than expected"
+                ) from None
 
             try:
                 # Raise the exception if the matched file contents are an
@@ -390,7 +392,7 @@ class MockOpen:
         except KeyError:
             # No matching glob in read_data, treat this as a file that does
             # not exist and raise the appropriate exception.
-            raise OSError(errno.ENOENT, "No such file or directory", name)
+            raise OSError(errno.ENOENT, "No such file or directory", name) from None
 
     def write_calls(self, path=None):
         """
@@ -453,4 +455,4 @@ class MockTimedProc:
 
 
 # reimplement mock_open to support multiple filehandles
-mock_open = MockOpen
+mock_open = MockOpen  # pylint: disable=invalid-name

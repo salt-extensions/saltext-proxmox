@@ -2,7 +2,7 @@
 name: Docs
 about: Issue related to Salt Documentation
 title: "[DOCS]"
-labels: documentation, needs triage
+labels: documentation, needs-triage
 assignees: ''
 
 ---
@@ -14,10 +14,10 @@ A clear and concise description of what the problem is. Ex. I'm always frustrate
 What did you expect to see in the documentation that is missing or needs updating?
 
 **Type of documentation**
-This could be Salt modules or tutorital topics.
+This could be module documentation or a guide.
 
 **Location or format of documentation**
 Insert page URL if applicable.
 
 **Additional context**
-Add any other context or screenshots about the feature request here.
+Add any other context or screenshots here.

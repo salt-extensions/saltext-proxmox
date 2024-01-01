@@ -20,93 +20,97 @@ This cloud module is a wrapper for the Proxmox API. As such, all supported param
 
 Profile configuration examples:
 
-.. collapse:: Create a new LXC container
+Create a new LXC container
+--------------------------
 
-    .. code-block:: yaml
+.. code-block:: yaml
 
-        my-lxc-container:
-            provider: my-proxmox-config
-            technology: lxc
+    my-lxc-container:
+        provider: my-proxmox-config
+        technology: lxc
 
-            # Required for cloud.bootstrap()
-            ssh_host: 192.168.101.2
-            ssh_username: root
-            ssh_password: supersecret
+        # Required for cloud.bootstrap()
+        ssh_host: 192.168.101.2
+        ssh_username: root
+        ssh_password: supersecret
 
-            create:
-                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc
-                vmid: 123
-                ostemplate:  local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
-                node: proxmox-node1
+        create:
+            # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc
+            vmid: 123
+            ostemplate:  local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
+            node: proxmox-node1
 
-                hostname: my-lxc-container
-                net0: name=eth0,bridge=vmbr0,firewall=1,gw=192.168.101.1,ip=192.168.101.2/24,tag=101,type=veth
-                password: supersecret
+            hostname: my-lxc-container
+            net0: name=eth0,bridge=vmbr0,firewall=1,gw=192.168.101.1,ip=192.168.101.2/24,tag=101,type=veth
+            password: supersecret
 
-.. collapse:: Clone an existing LXC container
+Clone an existing LXC container
+-------------------------------
 
-    .. code-block:: yaml
+.. code-block:: yaml
 
-       my-lxc-container:
-            provider: my-proxmox-config
-            technology: lxc
+   my-lxc-container:
+        provider: my-proxmox-config
+        technology: lxc
 
-            # Required for cloud.bootstrap()
-            ssh_host: 192.168.101.2
-            ssh_username: root
-            ssh_password: supersecret
+        # Required for cloud.bootstrap()
+        ssh_host: 192.168.101.2
+        ssh_username: root
+        ssh_password: supersecret
 
-            clone:
-                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/clone
-                vmid: 123
-                newid: 456
-                node: proxmox-node1
+        clone:
+            # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc/clone
+            vmid: 123
+            newid: 456
+            node: proxmox-node1
 
-                hostname: my-lxc-container
-                description: cloned vm
+            hostname: my-lxc-container
+            description: cloned vm
 
-.. collapse:: Create a new QEMU VM
+Create a new QEMU VM
+--------------------
 
-    .. code-block:: yaml
+.. code-block:: yaml
 
-        my-qemu-vm:
-            provider: my-proxmox-config
-            technology: qemu
+    my-qemu-vm:
+        provider: my-proxmox-config
+        technology: qemu
 
-            # Required for cloud.bootstrap()
-            ssh_host: 192.168.101.2
-            ssh_username: root
-            ssh_password: supersecret
+        # Required for cloud.bootstrap()
+        ssh_host: 192.168.101.2
+        ssh_username: root
+        ssh_password: supersecret
 
-            create:
-                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu
-                vmid: 123
-                node: proxmox-node1
+        create:
+            # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu
+            vmid: 123
+            node: proxmox-node1
 
-                name: my-qemu-vm
-                ipconfig0: ip=192.168.101.2/24,gw=192.168.101.1
+            name: my-qemu-vm
+            ipconfig0: ip=192.168.101.2/24,gw=192.168.101.1
 
-.. collapse:: Clone an existing QEMU VM:
+Clone an existing QEMU VM
+-------------------------
 
-    .. code-block:: yaml
+.. code-block:: yaml
 
-        my-qemu-vm:
-            provider: my-proxmox-config
-            technology: qemu
+    my-qemu-vm:
+        provider: my-proxmox-config
+        technology: qemu
 
-            # Required for cloud.bootstrap()
-            ssh_host: 192.168.101.2
-            ssh_username: root
-            ssh_password: supersecret
+        # Required for cloud.bootstrap()
+        ssh_host: 192.168.101.2
+        ssh_username: root
+        ssh_password: supersecret
 
-            clone:
-                # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/clone
-                vmid: 123
-                newid: 456
-                node: proxmox-node1
+        clone:
+            # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/clone
+            vmid: 123
+            newid: 456
+            node: proxmox-node1
 
-                name: my-qemu-vm
-                description: cloned vm
+            name: my-qemu-vm
+            description: cloned vm
 
 :maintainer: EITR Technologies, LLC <devops@eitr.tech>
 :depends: requests >= 2.2.1
@@ -178,11 +182,11 @@ def create(vm_):
     """
     Create a single Proxmox VM.
     """
-    __utils__["cloud.fire_event"](
+    salt.utils.cloud.fire_event(
         "event",
         "starting create",
-        "salt/cloud/{}/creating".format(vm_["name"]),
-        args=__utils__["cloud.filter_event"](
+        "salt/cloud/{}/creating".format(vm_["name"]),  # pylint: disable=consider-using-f-string
+        args=salt.utils.cloud.filter_event(
             "creating", vm_, ["name", "profile", "provider", "driver"]
         ),
         sock_dir=__opts__["sock_dir"],
@@ -203,15 +207,15 @@ def create(vm_):
 
     # cloud.bootstrap expects the ssh_password to be set in vm_["password"]
     vm_["password"] = vm_.get("ssh_password")
-    ret = __utils__["cloud.bootstrap"](vm_, __opts__)
+    ret = salt.utils.cloud.bootstrap(vm_, __opts__)
 
     ret.update(show_instance(call="action", name=vm_["name"]))
 
-    __utils__["cloud.fire_event"](
+    salt.utils.cloud.fire_event(
         "event",
         "created instance",
         f"salt/cloud/{vm_['name']}/created",
-        args=__utils__["cloud.filter_event"](
+        args=salt.utils.cloud.filter_event(
             "created", vm_, ["name", "profile", "provider", "driver"]
         ),
         sock_dir=__opts__["sock_dir"],
@@ -313,7 +317,7 @@ def destroy(name=None, kwargs=None, call=None):
             "The destroy action must be called with -d, --destroy, -a or --action."
         )
 
-    __utils__["cloud.fire_event"](
+    salt.utils.cloud.fire_event(
         "event",
         "destroying instance",
         f"salt/cloud/{name}/destroying",
@@ -326,7 +330,7 @@ def destroy(name=None, kwargs=None, call=None):
 
     _query("DELETE", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}", kwargs)
 
-    __utils__["cloud.fire_event"](
+    salt.utils.cloud.fire_event(
         "event",
         "destroyed instance",
         f"salt/cloud/{name}/destroyed",
@@ -626,6 +630,7 @@ def _query(method, path, data=None):
                 url=url,
                 headers=headers,
                 params=data,
+                timeout=10,
             )
         else:
             headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -634,6 +639,7 @@ def _query(method, path, data=None):
                 url=url,
                 headers=headers,
                 data=data,
+                timeout=10,
             )
 
         response.raise_for_status()
@@ -642,7 +648,7 @@ def _query(method, path, data=None):
 
     except requests.exceptions.RequestException as err:
         log.error("Error in query to %s:\n%s", url, response.text)
-        raise SaltCloudSystemExit(err)
+        raise SaltCloudSystemExit(err) from err
 
 
 def _get_url():
