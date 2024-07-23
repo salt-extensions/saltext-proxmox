@@ -1,14 +1,15 @@
 """
     :codeauthor: Bernhard Gally <github.com/I3urny>
 """
+
 import io
 
 import pytest
 import requests
 from salt.exceptions import SaltCloudNotFound
 from salt.exceptions import SaltCloudSystemExit
-from saltext.proxmox.clouds import proxmox
 
+from saltext.proxmox.clouds import proxmox
 from tests.support.mock import MagicMock
 from tests.support.mock import patch
 

@@ -115,6 +115,7 @@ Clone an existing QEMU VM
 :maintainer: EITR Technologies, LLC <devops@eitr.tech>
 :depends: requests >= 2.2.1
 """
+
 import logging
 import time
 from ipaddress import ip_interface
