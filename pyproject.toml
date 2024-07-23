@@ -73,8 +73,8 @@ lint = [
     "saltpylint",
 ]
 tests = [
-    "pytest>=6.1.0",
-    "pytest-salt-factories>=1.0.0rc19",
+    "pytest>=7.2.0",
+    "pytest-salt-factories>=1.0.0",
 ]
 
 [project.entry-points."salt.loader"]
@@ -104,42 +104,48 @@ build_dir = "build/sphinx"
 [tool.black]
 line-length = 100
 
+[tool.isort]
+force_single_line = true
+skip = ["src/saltext/proxmox/__init__.py"]
+profile = "black"
+line_length = 100
+
 [tool.towncrier]
-    package = "saltext.proxmox"
-    filename = "CHANGELOG.md"
-    template = "changelog/.template.jinja"
-    directory = "changelog/"
-    start_string = "# Changelog\n"
-    underlines = ["", "", ""]
-    title_format = "## {version} ({project_date})"
-    issue_format = "[#{issue}](https://github.com/salt-extensions/saltext-proxmox/issues/{issue})"
+package = "saltext.proxmox"
+filename = "CHANGELOG.md"
+template = "changelog/.template.jinja"
+directory = "changelog/"
+start_string = "# Changelog\n"
+underlines = ["", "", ""]
+title_format = "## {version} ({project_date})"
+issue_format = "[#{issue}](https://github.com/salt-extensions/saltext-proxmox/issues/{issue})"
 
-    [[tool.towncrier.type]]
-        directory = "removed"
-        name = "Removed"
-        showcontent = true
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
 
-    [[tool.towncrier.type]]
-        directory = "deprecated"
-        name = "Deprecated"
-        showcontent = true
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
 
-    [[tool.towncrier.type]]
-        directory = "changed"
-        name = "Changed"
-        showcontent = true
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
 
-    [[tool.towncrier.type]]
-        directory = "fixed"
-        name = "Fixed"
-        showcontent = true
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
 
-    [[tool.towncrier.type]]
-        directory = "added"
-        name = "Added"
-        showcontent = true
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
 
-    [[tool.towncrier.type]]
-        directory = "security"
-        name = "Security"
-        showcontent = true
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true

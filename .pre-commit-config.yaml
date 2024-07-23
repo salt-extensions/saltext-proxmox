@@ -2,7 +2,7 @@
 minimum_pre_commit_version: 2.4.0
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.6.0
     hooks:
       - id: check-merge-conflict  # Check for files that contain merge conflict strings.
       - id: trailing-whitespace   # Trims trailing whitespace.
@@ -56,7 +56,7 @@ repos:
         args: [--silent, -E, fix_docstrings]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.37.2
+    rev: v3.15.2
     hooks:
       - id: pyupgrade
         name: Rewrite Code to be Py3.8+
@@ -65,35 +65,35 @@ repos:
         ]
         exclude: src/saltext/proxmox/version.py
 
-  - repo: https://github.com/asottile/reorder_python_imports
-    rev: v3.10.0
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
     hooks:
-      - id: reorder-python-imports
+      - id: isort
         args: [
-          --py38-plus,
+          --py 38,
         ]
-        exclude: src/saltext/proxmox/version.py
+        exclude: src/saltext/proxmox/(__init__|version).py
 
   - repo: https://github.com/psf/black
-    rev: 22.6.0
+    rev: 24.2.0
     hooks:
       - id: black
         args: [-l 100]
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/adamchainz/blacken-docs
-    rev: v1.12.1
+    rev: 1.16.0
     hooks:
       - id: blacken-docs
         args: [--skip-errors]
         files: ^(docs/.*\.rst|src/saltext/proxmox/.*\.py)$
         additional_dependencies:
-          - black==22.6.0
+          - black==24.2.0
   # <---- Formatting -----------------------------------------------------------------------------
 
   # ----- Security ------------------------------------------------------------------------------>
   - repo: https://github.com/PyCQA/bandit
-    rev: "1.7.4"
+    rev: 1.7.8
     hooks:
       - id: bandit
         alias: bandit-salt
@@ -101,7 +101,7 @@ repos:
         args: [--silent, -lll, --skip, B701]
         exclude: src/saltext/proxmox/version.py
   - repo: https://github.com/PyCQA/bandit
-    rev: "1.7.4"
+    rev: 1.7.8
     hooks:
       - id: bandit
         alias: bandit-tests
@@ -112,7 +112,7 @@ repos:
 
   # ----- Code Analysis ------------------------------------------------------------------------->
   - repo: https://github.com/saltstack/mirrors-nox
-    rev: v2021.6.12
+    rev: v2022.11.21
     hooks:
       - id: nox
         alias: lint-src
@@ -125,7 +125,7 @@ repos:
           - --
 
   - repo: https://github.com/saltstack/mirrors-nox
-    rev: v2021.6.12
+    rev: v2022.11.21
     hooks:
       - id: nox
         alias: lint-tests

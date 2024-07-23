@@ -22,7 +22,6 @@ jobs:
     needs: get_tag_version
     uses: salt-extensions/central-artifacts/.github/workflows/ci.yml@main
     with:
-      setup-vault: true
       release: true
       version: ${{ needs.get_tag_version.outputs.version }}
     permissions:
