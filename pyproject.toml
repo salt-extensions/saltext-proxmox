@@ -12,7 +12,7 @@ write_to_template = "__version__ = \"{version}\""
 
 [project]
 name = "saltext.proxmox"
-description = "Salt Extension for interacting with Proxmox"
+description = "Salt Extension for interacting with Proxmox PVE"
 authors = [
     {name = "EITR Technologies, LLC", email = "devops@eitr.tech"},
 ]
@@ -28,6 +28,8 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
@@ -45,6 +47,7 @@ content-type = "text/markdown"
 
 [project.urls]
 Homepage = "https://github.com/salt-extensions/saltext-proxmox"
+Documentation = "https://salt-extensions.github.io/saltext-proxmox/"
 Source = "https://github.com/salt-extensions/saltext-proxmox"
 Tracker = "https://github.com/salt-extensions/saltext-proxmox/issues"
 

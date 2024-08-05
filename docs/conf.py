@@ -42,10 +42,10 @@ dist = distribution("saltext.proxmox")
 
 # -- Project information -----------------------------------------------------
 this_year = datetime.datetime.today().year
-if this_year == 2021:
-    copyright_year = 2021
+if this_year == 2023:
+    copyright_year = "2023"
 else:
-    copyright_year = f"2021 - {this_year}"
+    copyright_year = f"2023 - {this_year}"
 project = dist.metadata["Summary"]
 author = dist.metadata.get("Author")
 

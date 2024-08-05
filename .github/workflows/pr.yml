@@ -12,6 +12,10 @@ jobs:
   call_central_workflow:
     name: CI
     uses: salt-extensions/central-artifacts/.github/workflows/ci.yml@main
+    with:
+      deploy-docs: true
     permissions:
       contents: write
+      id-token: write
+      pages: write
       pull-requests: read

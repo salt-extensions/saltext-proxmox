@@ -16,16 +16,18 @@ jobs:
 
       - name: Extract tag name
         id: get_version
-        run: echo "::set-output name=version::$(echo ${GITHUB_REF#refs/tags/v})"
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/v})" >> $GITHUB_OUTPUT
 
   call_central_workflow:
     needs: get_tag_version
     uses: salt-extensions/central-artifacts/.github/workflows/ci.yml@main
     with:
+      deploy-docs: true
       release: true
       version: ${{ needs.get_tag_version.outputs.version }}
     permissions:
       contents: write
       id-token: write
+      pages: write
       pull-requests: read
     secrets: inherit
