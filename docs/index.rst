@@ -9,7 +9,6 @@ Salt Extension for interacting with Proxmox PVE
   :hidden:
 
   topics/installation
-  topics/index
 
 .. toctree::
   :maxdepth: 2
