@@ -4,7 +4,7 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
-# Saltext.Proxmox 1.1.0 (2023-10-11)
+## v1.1.0 (2023-10-11)
 
 ### Removed
 
@@ -21,7 +21,7 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 - fixed location parameter for `avail_images()` (#25)
 
 
-# Saltext.Proxmox 1.0.0 (2023-04-26)
+## v1.0.0 (2023-04-26)
 
 ### Added
 
