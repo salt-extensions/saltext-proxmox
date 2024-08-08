@@ -4,6 +4,21 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
+## v2.0.0 (2024-08-08)
+
+
+### Changed
+
+- changed parameter structure for profiles [#9](https://github.com/salt-extensions/saltext-proxmox/issues/9)
+- removed custom parameters for VMs (ip_address). instead, VM parameters are forwarded directly to proxmox api [#21](https://github.com/salt-extensions/saltext-proxmox/issues/21)
+- removed arbitrary limit for indexed parameters. instead, VM parameters are forwarded directly to proxmox api [#29](https://github.com/salt-extensions/saltext-proxmox/issues/29)
+
+
+### Added
+
+- VM parameters are forwarded directly to proxmox api. the documentation references the proxmox api docs to look up possible parameters [#12](https://github.com/salt-extensions/saltext-proxmox/issues/12)
+
+
 ## v1.1.0 (2023-10-11)
 
 ### Removed
