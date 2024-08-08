@@ -1,7 +1,7 @@
 ``saltext-proxmox``: Integrate Salt with Proxmox
 ================================================
 
-Salt Extension for interacting with Proxmox
+Salt Extension for interacting with Proxmox PVE
 
 .. toctree::
   :maxdepth: 2

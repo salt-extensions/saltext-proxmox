@@ -3,7 +3,6 @@ import os.path
 import subprocess
 from pathlib import Path
 
-
 repo_path = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode().strip())
 src_dir = repo_path / "src" / "saltext" / "proxmox"
 doc_dir = repo_path / "docs"

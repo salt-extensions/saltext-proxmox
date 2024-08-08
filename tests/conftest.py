@@ -2,9 +2,9 @@ import logging
 import os
 
 import pytest
-from saltext.proxmox import PACKAGE_ROOT
 from saltfactories.utils import random_string
 
+from saltext.proxmox import PACKAGE_ROOT
 
 # Reset the root logger to its default level(because salt changed it)
 logging.root.setLevel(logging.WARNING)

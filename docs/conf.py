@@ -42,12 +42,12 @@ dist = distribution("saltext.proxmox")
 
 # -- Project information -----------------------------------------------------
 this_year = datetime.datetime.today().year
-if this_year == 2021:
-    copyright_year = 2021
+if this_year == 2023:
+    copyright_year = "2023"
 else:
-    copyright_year = f"2021 - {this_year}"
+    copyright_year = f"2023 - {this_year}"
 project = dist.metadata["Summary"]
-author = dist.metadata["Author"]
+author = dist.metadata.get("Author")
 
 if author is None:
     # Core metadata is serialized differently with pyproject.toml:
@@ -79,6 +79,8 @@ rst_prolog = """
 
 # -- General configuration ---------------------------------------------------
 
+linkcheck_ignore = [r"http://localhost:\d+"]
+
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
@@ -92,6 +94,7 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx_copybutton",
     "sphinxcontrib.spelling",
+    "saltdomain",
     "sphinxcontrib.towncrier.ext",
     "myst_parser",
     "sphinx_inline_tabs",

@@ -11,6 +11,7 @@
     Note: mock >= 2.0.0 required since unittest.mock does not have
     MagicMock.assert_called in Python < 3.6.
 """
+
 # pylint: disable=unused-import,function-redefined
 import copy
 import errno
@@ -18,16 +19,16 @@ import fnmatch
 import sys
 from unittest import mock
 from unittest.mock import ANY
-from unittest.mock import call
-from unittest.mock import create_autospec
 from unittest.mock import DEFAULT
 from unittest.mock import FILTER_DIR
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 from unittest.mock import NonCallableMagicMock
 from unittest.mock import NonCallableMock
-from unittest.mock import patch
 from unittest.mock import PropertyMock
+from unittest.mock import call
+from unittest.mock import create_autospec
+from unittest.mock import patch
 from unittest.mock import sentinel
 
 import salt.utils.stringutils
