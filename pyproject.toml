@@ -37,7 +37,7 @@ classifiers = [
 requires-python = ">= 3.8"
 dynamic = ["version"]
 dependencies = [
-    "requests>=2.2.1",
+    "proxmoxer>=2.0.1",
     "salt>=3005",
 ]
 

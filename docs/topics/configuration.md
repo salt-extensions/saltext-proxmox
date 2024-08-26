@@ -6,9 +6,10 @@ Set up the cloud configuration at `/etc/salt/cloud.providers` or `/etc/salt/clou
 ```yaml
 my-proxmox-config:
   # Required parameters
+  host: hypervisor.domain.tld:8006
   user: myuser@pam  # or myuser@pve
-  token: myapitoken
-  url: https://hypervisor.domain.tld:8006
+  token_name: myapitoken_name
+  token_value: myapitoken_value
   driver: proxmox
 ```
 
