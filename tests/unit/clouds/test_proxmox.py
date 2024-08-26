@@ -29,6 +29,7 @@ def configure_loader_modules():
             },
             "__utils__": {
                 "cloud.filter_event": MagicMock(),
+                "cloud.bootstrap": MagicMock(),
             },
             "__active_provider_name__": "",
         }
@@ -60,9 +61,7 @@ def test_create(
     upid = "UPID:node1:0016BEC6:568EF5F4:669FB044:qmcreate:101:user@pam!mytoken:"
     mock__get_proxmox_client.return_value.post.return_value = upid
 
-    with patch("salt.utils.cloud.bootstrap", MagicMock()), patch(
-        "salt.utils.cloud.fire_event", MagicMock()
-    ):
+    with patch("salt.utils.cloud.fire_event", MagicMock()):
         proxmox.create(create_config)
 
     mock__get_proxmox_client.return_value.post.assert_called_with(
@@ -84,9 +83,7 @@ def test_create_with_missing_technology_argument():
         },
     }
 
-    with pytest.raises(SaltCloudSystemExit), patch(
-        "salt.utils.cloud.bootstrap", MagicMock()
-    ), patch("salt.utils.cloud.fire_event", MagicMock()):
+    with pytest.raises(SaltCloudSystemExit), patch("salt.utils.cloud.fire_event", MagicMock()):
         proxmox.create(create_config)
 
 
@@ -109,9 +106,7 @@ def test_create_with_clone(
         },
     }
 
-    with patch("salt.utils.cloud.bootstrap", MagicMock()), patch(
-        "salt.utils.cloud.fire_event", MagicMock()
-    ):
+    with patch("salt.utils.cloud.fire_event", MagicMock()):
         proxmox.create(clone_config)
 
     mock_clone.assert_called()
