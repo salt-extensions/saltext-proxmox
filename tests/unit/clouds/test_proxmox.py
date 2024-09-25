@@ -3,6 +3,8 @@
 """
 
 import io
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 import requests
@@ -10,8 +12,6 @@ from salt.exceptions import SaltCloudNotFound
 from salt.exceptions import SaltCloudSystemExit
 
 from saltext.proxmox.clouds import proxmox
-from tests.support.mock import MagicMock
-from tests.support.mock import patch
 
 
 def _fqn(function):
@@ -369,7 +369,6 @@ def test_list_nodes_full_when_called_as_action():
 
 @patch(_fqn(proxmox.list_nodes_full))
 def test_show_instance(mock_list_nodes_full: MagicMock):
-    """ """
     mock_list_nodes_full.return_value = {
         "my-proxmox-vm": {
             "vmid": 100,
@@ -617,7 +616,7 @@ def test__stringlist_to_dictionary_when_empty():
     Test that an empty stringlist returns an empty dict
     """
     result = proxmox._stringlist_to_dictionary("")
-    assert result == dict()
+    assert result == {}  # pylint: disable=use-implicit-booleaness-not-comparison
 
 
 def test__stringlist_to_dictionary_when_containing_leading_or_trailing_spaces():

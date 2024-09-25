@@ -30,10 +30,26 @@ def salt_factories_config():
 
 
 @pytest.fixture(scope="package")
-def master(salt_factories):
-    return salt_factories.salt_master_daemon(random_string("master-"))
+def master_config():
+    """
+    Salt master configuration overrides for integration tests.
+    """
+    return {}
 
 
 @pytest.fixture(scope="package")
-def minion(master):
-    return master.salt_minion_daemon(random_string("minion-"))
+def master(salt_factories, master_config):
+    return salt_factories.salt_master_daemon(random_string("master-"), overrides=master_config)
+
+
+@pytest.fixture(scope="package")
+def minion_config():
+    """
+    Salt minion configuration overrides for integration tests.
+    """
+    return {}
+
+
+@pytest.fixture(scope="package")
+def minion(master, minion_config):
+    return master.salt_minion_daemon(random_string("minion-"), overrides=minion_config)

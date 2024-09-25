@@ -54,10 +54,8 @@ Tracker = "https://github.com/salt-extensions/saltext-proxmox/issues"
 [project.optional-dependencies]
 changelog = ["towncrier==22.12.0"]
 dev = [
-    "nox",
-    "pre-commit>=2.4.0",
-    "pylint",
-    "saltpylint",
+    "nox[uv]>=2024.3",
+    "pre-commit>=2.21.0",
 ]
 docs = [
   "sphinx",
@@ -72,8 +70,7 @@ docs = [
 ]
 docsauto = ["sphinx-autobuild"]
 lint = [
-    "pylint",
-    "saltpylint",
+    "pylint==3.2.6",
 ]
 tests = [
     "pytest>=7.2.0",

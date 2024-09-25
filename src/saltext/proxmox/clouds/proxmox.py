@@ -16,9 +16,9 @@ import logging
 import time
 from ipaddress import ip_interface
 
-import salt.config as config
 import salt.utils.cloud
 import salt.utils.json
+from salt import config
 from salt.exceptions import SaltCloudExecutionTimeout
 from salt.exceptions import SaltCloudNotFound
 from salt.exceptions import SaltCloudSystemExit
@@ -93,7 +93,7 @@ def create(vm_):
     type = vm_.get("technology")
 
     clone_options = vm_.get("clone")
-    should_clone = True if clone_options else False
+    should_clone = bool(clone_options)
 
     if should_clone:
         clone(call="function", kwargs=clone_options)
