@@ -4,82 +4,98 @@ Salt Extension for interacting with Proxmox PVE
 
 ## Security
 
-If you think you have found a security vulnerability, see
-[Salt's security guide][security].
+If you discover a security vulnerability, please refer
+to [Salt's security guide][security].
 
 ## User Documentation
 
-This README is for people aiming to contribute to the project.
-If you just want to get started with the extension, check out the
+For setup and usage instructions, please refer to the
 [User Documentation][docs].
 
 ## Contributing
 
-The saltext-proxmox project team welcomes contributions from the community.
+The saltext-proxmox project welcomes contributions from anyone!
 
-The [Salt Contributing guide][salt-contributing] has a lot of relevant
-information, but if you'd like to jump right in here's how to get started:
+The [Salt Extensions guide][salt-extensions-guide] provides comprehensive instructions on all aspects
+of Salt extension development, including [writing tests][writing-tests], [running tests][running-tests],
+[writing documentation][writing-docs] and [rendering the docs][rendering-docs].
 
+### Quickstart
+
+To get started contributing, first clone this repository (or your fork):
 
 ```bash
 # Clone the repo
-git clone --origin salt git@github.com:salt-extensions/saltext-proxmox.git
+git clone --origin upstream git@github.com:salt-extensions/saltext-proxmox.git
 
 # Change to the repo dir
 cd saltext-proxmox
-
-# Create a new venv
-python3 -m venv env --prompt saltext-proxmox
-source env/bin/activate
-
-# On mac, you may need to upgrade pip
-python -m pip install --upgrade pip
-
-# On WSL or some flavors of linux you may need to install the `enchant`
-# library in order to build the docs
-sudo apt-get install -y enchant
-
-# Install extension + test/dev/doc dependencies into your environment
-python -m pip install -e '.[tests,dev,docs]'
-
-# Run tests!
-python -m nox -e tests-3
-
-# skip requirements install for next time
-export SKIP_REQUIREMENTS_INSTALL=1
-
-# Build the docs, serve, and view in your web browser:
-python -m nox -e docs && (cd docs/_build/html; python -m webbrowser localhost:8000; python -m http.server; cd -)
 ```
 
-Writing code isn't the only way to contribute! We value contributions in any of
-these areas:
+#### Automatic
+If you have installed [direnv][direnv], allowing the project's `.envrc` ensures
+a proper development environment is present and the virtual environment is active.
 
-* Documentation - especially examples of how to use this module to solve
-  specific problems.
-* Triaging [issues][issues] and participating in [discussions][discussions]
-* Reviewing [Pull Requests][PRs] (we really like
-  [Conventional Comments][comments]!)
+Without `direnv`, you can still run the automation explicitly:
 
-You could also contribute in other ways:
+```bash
+python3 tools/initialize.py
+source .venv/bin/activate
+```
+
+#### Manual
+Please follow the [first steps][first-steps], skipping the repository initialization and first commit.
+
+### Pull request
+
+Always make changes in a feature branch:
+
+```bash
+git switch -c my-feature-branch
+```
+
+To [submit a Pull Request][submitting-pr], you'll need a fork of this repository in
+your own GitHub account. If you followed the instructions above,
+set your fork as the `origin` remote now:
+
+```bash
+git remote add origin git@github.com:<your_fork>.git
+```
+
+Ensure you followed the [first steps][first-steps] and commit your changes, fixing any
+failing `pre-commit` hooks. Then push the feature branch to your fork and submit a PR.
+
+### Ways to contribute
+
+Contributions come in many forms, and they’re all valuable! Here are some ways you can help
+without writing code:
+
+* **Documentation**: Especially examples showing how to use this project
+  to solve specific problems.
+* **Triaging issues**: Help manage [issues][issues] and participate in [discussions][discussions].
+* **Reviewing [Pull Requests][PRs]**: We especially appreciate reviews using [Conventional Comments][comments].
+
+You can also contribute by:
 
 * Writing blog posts
-* Posting on social media about how you used Salt + Proxmox PVE to solve your
-  problems, including videos
+* Sharing your experiences using Salt + Proxmox PVE
+  on social media
 * Giving talks at conferences
 * Publishing videos
-* Asking/answering questions in IRC, Discord or email groups
+* Engaging in IRC, Discord or email groups
 
 Any of these things are super valuable to our community, and we sincerely
 appreciate every contribution!
 
-
-For more information, build the docs and head over to http://localhost:8000/ —
-that's where you'll find the rest of the documentation.
-
-
 [security]: https://github.com/saltstack/salt/blob/master/SECURITY.md
-[salt-contributing]: https://docs.saltproject.io/en/master/topics/development/contributing.html
+[salt-extensions-guide]: https://salt-extensions.github.io/salt-extension-copier/
+[writing-tests]: https://salt-extensions.github.io/salt-extension-copier/topics/testing/writing.html
+[running-tests]: https://salt-extensions.github.io/salt-extension-copier/topics/testing/running.html
+[writing-docs]: https://salt-extensions.github.io/salt-extension-copier/topics/documenting/writing.html
+[rendering-docs]: https://salt-extensions.github.io/salt-extension-copier/topics/documenting/building.html
+[first-steps]: https://salt-extensions.github.io/salt-extension-copier/topics/creation.html#initialize-the-python-virtual-environment
+[submitting-pr]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork
+[direnv]: https://direnv.net
 [issues]: https://github.com/salt-extensions/saltext-proxmox/issues
 [PRs]: https://github.com/salt-extensions/saltext-proxmox/pulls
 [discussions]: https://github.com/salt-extensions/saltext-proxmox/discussions

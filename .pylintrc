@@ -39,7 +39,7 @@ extension-pkg-whitelist=
 fail-on=
 
 # Specify a score threshold under which the program will exit with error.
-fail-under=10
+fail-under=10.0
 
 # Interpret the stdin as a python script, whose filename needs to be passed as
 # the module_or_package argument.
@@ -59,10 +59,11 @@ ignore-paths=
 # Emacs file locks
 ignore-patterns=^\.#
 
-# List of module names for which member attributes should not be checked
-# (useful for modules/projects where namespaces are manipulated during runtime
-# and thus existing member attributes cannot be deduced by static analysis). It
-# supports qualified module names, as well as Unix pattern matching.
+# List of module names for which member attributes should not be checked and
+# will not be imported (useful for modules/projects where namespaces are
+# manipulated during runtime and thus existing member attributes cannot be
+# deduced by static analysis). It supports qualified module names, as well as
+# Unix pattern matching.
 ignored-modules=
 
 # Python code to execute, usually for sys.path manipulation such as
@@ -86,9 +87,13 @@ load-plugins=
 # Pickle collected data for later comparisons.
 persistent=yes
 
+# Resolve imports to .pyi stubs if available. May reduce no-member messages and
+# increase not-an-iterable messages.
+prefer-stubs=no
+
 # Minimum Python version to use for version dependent checks. Will default to
 # the version used to run pylint.
-py-version=3.10
+py-version=3.8
 
 # Discover python modules and packages in the file system subtree.
 recursive=no
@@ -285,19 +290,19 @@ exclude-too-few-public-methods=
 ignored-parents=
 
 # Maximum number of arguments for function / method.
-max-args=15
+max-args=35
 
 # Maximum number of attributes for a class (see R0902).
-max-attributes=7
+max-attributes=15
 
 # Maximum number of boolean expressions in an if statement (see R0916).
-max-bool-expr=5
+max-bool-expr=8
 
 # Maximum number of branch for function / method body.
-max-branches=12
+max-branches=48
 
 # Maximum number of locals for function / method body.
-max-locals=15
+max-locals=40
 
 # Maximum number of parents for a class (see R0901).
 max-parents=7
@@ -306,10 +311,10 @@ max-parents=7
 max-public-methods=25
 
 # Maximum number of return / yield for function / method body.
-max-returns=6
+max-returns=10
 
 # Maximum number of statements in function / method body.
-max-statements=50
+max-statements=100
 
 # Minimum number of public methods for a class (see R0903).
 min-public-methods=2
@@ -324,7 +329,7 @@ overgeneral-exceptions=builtins.BaseException,builtins.Exception
 [FORMAT]
 
 # Expected format of line ending, e.g. empty (any line ending), LF or CRLF.
-expected-line-ending-format=
+expected-line-ending-format=LF
 
 # Regexp for a line that is allowed to be longer than the limit.
 ignore-long-lines=^\s*(# )?<?https?://\S+>?$
@@ -337,10 +342,10 @@ indent-after-paren=4
 indent-string='    '
 
 # Maximum number of characters on a single line.
-max-line-length=100
+max-line-length=120
 
 # Maximum number of lines in a module.
-max-module-lines=2000
+max-module-lines=3000
 
 # Allow the body of a class to be on the same line as the declaration if body
 # contains single statement.
@@ -421,43 +426,18 @@ confidence=HIGH,
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use "--disable=all --enable=classes
 # --disable=W".
-disable=R,
-  locally-disabled,
-  file-ignored,
-  unexpected-special-method-signature,
-  import-error,
-  no-member,
-  unsubscriptable-object,
-  blacklisted-name,
-  invalid-name,
-  missing-docstring,
-  empty-docstring,
-  unidiomatic-typecheck,
-  wrong-import-order,
-  ungrouped-imports,
-  wrong-import-position,
-  bad-mcs-method-argument,
-  bad-mcs-classmethod-argument,
-  line-too-long,
-  too-many-lines,
-  bad-continuation,
-  exec-used,
-  attribute-defined-outside-init,
-  protected-access,
-  reimported,
-  fixme,
-  global-statement,
-  unused-variable,
-  unused-argument,
-  redefined-outer-name,
-  redefined-builtin,
-  undefined-loop-variable,
-  logging-format-interpolation,
-  invalid-format-index,
-  line-too-long,
-  import-outside-toplevel,
-  deprecated-method,
-  keyword-arg-before-vararg,
+disable=duplicate-code,
+        fixme,
+        keyword-arg-before-vararg,
+        line-too-long,
+        logging-fstring-interpolation,
+        missing-class-docstring,
+        missing-function-docstring,
+        missing-module-docstring,
+        protected-access,
+        too-few-public-methods,
+        ungrouped-imports,
+        wrong-import-position
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
@@ -495,6 +475,11 @@ max-nested-blocks=5
 # printed.
 never-returning-functions=sys.exit,argparse.parse_error
 
+# Let 'consider-using-join' be raised when the separator to join on would be
+# non-empty (resulting in expected fixes of the type: ``"- " + " -
+# ".join(items)``)
+suggest-join-with-non-empty-separator=yes
+
 
 [REPORTS]
 
@@ -509,8 +494,9 @@ evaluation=max(0, 0 if fatal else 10.0 - ((float(5 * error + warning + refactor 
 # used to format the message information. See doc for all details.
 msg-template=
 
-# Set the output format. Available formats are text, parseable, colorized, json
-# and msvs (visual studio). You can also give a reporter class, e.g.
+# Set the output format. Available formats are: text, parseable, colorized,
+# json2 (improved json format), json (old json format) and msvs (visual
+# studio). You can also give a reporter class, e.g.
 # mypackage.mymodule.MyReporterClass.
 #output-format=
 
@@ -544,8 +530,8 @@ min-similarity-lines=4
 # Limits count of emitted suggestions for spelling mistakes.
 max-spelling-suggestions=4
 
-# Spelling dictionary name. No available dictionaries : You need to install the
-# system dependency for enchant to work..
+# Spelling dictionary name. No available dictionaries : You need to install
+# both the python package and the system dependency for enchant to work.
 spelling-dict=
 
 # List of comma separated words that should be considered directives if they
@@ -633,27 +619,27 @@ signature-mutators=
 # List of additional names supposed to be defined in builtins. Remember that
 # you should avoid defining new builtins when possible.
 additional-builtins=__opts__,
-  __salt__,
-  __pillar__,
-  __grains__,
-  __context__,
-  __runner__,
-  __ret__,
-  __env__,
-  __low__,
-  __states__,
-  __lowstate__,
-  __running__,
-  __active_provider_name__,
-  __master_opts__,
-  __jid_event__,
-  __instance_id__,
-  __salt_system_encoding__,
-  __proxy__,
-  __serializers__,
-  __reg__,
-  __executors__,
-  __events__
+                    __salt__,
+                    __pillar__,
+                    __grains__,
+                    __context__,
+                    __runner__,
+                    __ret__,
+                    __env__,
+                    __low__,
+                    __states__,
+                    __lowstate__,
+                    __running__,
+                    __active_provider_name__,
+                    __master_opts__,
+                    __jid_event__,
+                    __instance_id__,
+                    __salt_system_encoding__,
+                    __proxy__,
+                    __serializers__,
+                    __reg__,
+                    __executors__,
+                    __events__
 
 # Tells whether unused global variables should be treated as a violation.
 allow-global-unused-variables=yes
