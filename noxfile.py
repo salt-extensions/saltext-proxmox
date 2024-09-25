@@ -362,7 +362,7 @@ def lint_tests(session):
     Run PyLint against the test suite. Set PYLINT_REPORT to a path to capture output.
     """
     flags = [
-        "--disable=I,redefined-outer-name,no-member,missing-module-docstring,missing-function-docstring,missing-class-docstring,attribute-defined-outside-init,inconsistent-return-statements,too-few-public-methods,too-many-public-methods",
+        "--disable=I,redefined-outer-name,no-member,missing-module-docstring,missing-function-docstring,missing-class-docstring,attribute-defined-outside-init,inconsistent-return-statements,too-few-public-methods,too-many-public-methods,unused-argument",
     ]
     if session.posargs:
         paths = session.posargs
@@ -390,7 +390,7 @@ def lint_tests_pre_commit(session):
     Run PyLint against the code and the test suite. Set PYLINT_REPORT to a path to capture output.
     """
     flags = [
-        "--disable=I,redefined-outer-name,no-member,missing-module-docstring,missing-function-docstring,missing-class-docstring,attribute-defined-outside-init,inconsistent-return-statements,too-few-public-methods,too-many-public-methods",
+        "--disable=I,redefined-outer-name,no-member,missing-module-docstring,missing-function-docstring,missing-class-docstring,attribute-defined-outside-init,inconsistent-return-statements,too-few-public-methods,too-many-public-methods,unused-argument",
     ]
     if session.posargs:
         paths = session.posargs

@@ -17,7 +17,7 @@ no_saltext_namespace: false
 package_name: proxmox
 project_name: proxmox
 python_requires: '3.8'
-relax_pylint: false
+relax_pylint: true
 salt_version: '3005'
 source_url: https://github.com/salt-extensions/saltext-proxmox
 ssh_fixtures: false
