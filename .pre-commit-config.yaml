@@ -35,7 +35,7 @@ repos:
         language: python
         pass_filenames: false
 
-  - repo: https://github.com/s0undt3ch/salt-rewrite
+  - repo: https://github.com/saltstack/salt-rewrite
     # Automatically rewrite code with known rules
     rev: 2.5.2
     hooks:
@@ -45,7 +45,7 @@ repos:
         files: ^src/saltext/proxmox/.*\.py$
         args: [--silent]
 
-  - repo: https://github.com/s0undt3ch/salt-rewrite
+  - repo: https://github.com/saltstack/salt-rewrite
     # Automatically rewrite code with known rules
     rev: 2.5.2
     hooks:

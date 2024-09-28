@@ -1,3 +1,4 @@
+import os
 import sys
 from functools import wraps
 from pathlib import Path
@@ -13,7 +14,33 @@ except ImportError:
     yaml = None
 
 
-COPIER_ANSWERS = Path(".copier-answers.yml").resolve()
+if os.environ.get("STAGE"):
+    # If we're running inside a Copier task/migration, cwd is the target dir.
+    # We cannot use __file__ because this file is imported from the template clone.
+    COPIER_ANSWERS = Path(".copier-answers.yml").resolve()
+else:
+    COPIER_ANSWERS = (Path(__file__).parent.parent.parent / ".copier-answers.yml").resolve()
+
+
+if yaml is not None:
+
+    def represent_str(dumper, data):
+        """
+        Represent multiline strings using "|"
+        """
+        if len(data.splitlines()) > 1:
+            return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data)
+
+    class OpinionatedYamlDumper(yaml.SafeDumper):
+        """
+        Indent lists by two spaces
+        """
+
+        def increase_indent(self, flow=False, indentless=False):
+            return super().increase_indent(flow=flow, indentless=False)
+
+    OpinionatedYamlDumper.add_representer(str, represent_str)
 
 
 def _needs_answers(func):
@@ -33,8 +60,27 @@ def load_answers():
     """
     if not yaml:
         raise RuntimeError("Missing pyyaml in environment")
-    with open(COPIER_ANSWERS) as f:
+    with open(COPIER_ANSWERS, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+@_needs_answers
+def dump_answers(answers):
+    """
+    Write the complete answers file. Depends on PyYAML.
+    Intended for answers migrations.
+    """
+    if not yaml:
+        raise RuntimeError("Missing pyyaml in environment")
+    with open(COPIER_ANSWERS, "w", encoding="utf-8") as f:
+        yaml.dump(
+            answers,
+            f,
+            Dumper=OpinionatedYamlDumper,
+            indent=0,
+            default_flow_style=False,
+            canonical=False,
+        )
 
 
 @_needs_answers

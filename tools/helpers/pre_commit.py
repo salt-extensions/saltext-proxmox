@@ -102,6 +102,14 @@ def run_pre_commit(venv, retries=2):
         for i, failing_hook in enumerate(failing):
             prompt.warn(f"✗ Failing hook ({i + 1}): {failing_hook}", failing[failing_hook])
     finally:
-        # Undo git add --intent-to-add to allow RenovateBot to detect new files correctly
-        git("restore", "--staged", *new_files)
+        if new_files:
+            try:
+                # Check if there is at least one commit in the repo,
+                # otherwise git restore --staged fails.
+                git("rev-parse", "HEAD")
+            except ProcessExecutionError:
+                pass
+            else:
+                # Undo git add --intent-to-add to allow RenovateBot to detect new files correctly
+                git("restore", "--staged", *new_files)
     return False
