@@ -35,12 +35,8 @@ classifiers = [
 requires-python = ">= 3.8"
 dynamic = ["version"]
 dependencies = [
-<<<<<<< before updating
-    "requests>=2.2.1",
-    "salt>=3005",
-=======
     "salt>=3006",
->>>>>>> after updating
+    "requests>=2.2.1",
 ]
 
 [project.readme]
