@@ -8,12 +8,12 @@ log = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="package")
-def minion_id():
+def minion_id():  # pragma: no cover
     return "func-tests-minion-opts"
 
 
 @pytest.fixture(scope="module")
-def state_tree(tmp_path_factory):
+def state_tree(tmp_path_factory):  # pragma: no cover
     state_tree_path = tmp_path_factory.mktemp("state-tree-base")
     try:
         yield state_tree_path
@@ -22,7 +22,7 @@ def state_tree(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def state_tree_prod(tmp_path_factory):
+def state_tree_prod(tmp_path_factory):  # pragma: no cover
     state_tree_path = tmp_path_factory.mktemp("state-tree-prod")
     try:
         yield state_tree_path
@@ -31,7 +31,7 @@ def state_tree_prod(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def minion_config_defaults():
+def minion_config_defaults():  # pragma: no cover
     """
     Functional test modules can provide this fixture to tweak the default
     configuration dictionary passed to the minion factory
@@ -40,7 +40,7 @@ def minion_config_defaults():
 
 
 @pytest.fixture(scope="module")
-def minion_config_overrides():
+def minion_config_overrides():  # pragma: no cover
     """
     Functional test modules can provide this fixture to tweak the configuration
     overrides dictionary passed to the minion factory
@@ -56,7 +56,7 @@ def minion_opts(
     state_tree_prod,
     minion_config_defaults,
     minion_config_overrides,
-):
+):  # pragma: no cover
     minion_config_overrides.update(
         {
             "file_client": "local",
@@ -79,7 +79,7 @@ def minion_opts(
 
 
 @pytest.fixture(scope="module")
-def master_config_defaults():
+def master_config_defaults():  # pragma: no cover
     """
     Functional test modules can provide this fixture to tweak the default
     configuration dictionary passed to the master factory
@@ -88,7 +88,7 @@ def master_config_defaults():
 
 
 @pytest.fixture(scope="module")
-def master_config_overrides():
+def master_config_overrides():  # pragma: no cover
     """
     Functional test modules can provide this fixture to tweak the configuration
     overrides dictionary passed to the master factory
@@ -103,7 +103,7 @@ def master_opts(
     state_tree_prod,
     master_config_defaults,
     master_config_overrides,
-):
+):  # pragma: no cover
     master_config_overrides.update(
         {
             "file_client": "local",
@@ -126,12 +126,12 @@ def master_opts(
 
 
 @pytest.fixture(scope="module")
-def loaders(minion_opts):
+def loaders(minion_opts):  # pragma: no cover
     return Loaders(minion_opts, loaded_base_name=f"{__name__}.loaded")
 
 
 @pytest.fixture(autouse=True)
-def reset_loaders_state(loaders):
+def reset_loaders_state(loaders):  # pragma: no cover
     try:
         # Run the tests
         yield
@@ -141,10 +141,10 @@ def reset_loaders_state(loaders):
 
 
 @pytest.fixture(scope="module")
-def modules(loaders):
+def modules(loaders):  # pragma: no cover
     return loaders.modules
 
 
 @pytest.fixture(scope="module")
-def states(loaders):
+def states(loaders):  # pragma: no cover
     return loaders.states

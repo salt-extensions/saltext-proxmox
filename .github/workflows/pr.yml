@@ -12,7 +12,7 @@ on:
 jobs:
   call_central_workflow:
     name: CI
-    uses: salt-extensions/central-artifacts/.github/workflows/ci.yml@main
+    uses: ./.github/workflows/ci.yml
     with:
       deploy-docs: true
     permissions:

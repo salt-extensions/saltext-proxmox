@@ -21,7 +21,7 @@ if tuple(map(int, metadata.version("nox").split("."))) >= (2024, 3):
     nox.options.default_venv_backend = "uv|virtualenv"
 
 # Python versions to test against
-PYTHON_VERSIONS = ("3", "3.8", "3.9", "3.10", "3.11", "3.12")
+PYTHON_VERSIONS = ("3", "3.8", "3.9", "3.10")
 # Be verbose when running under a CI context
 CI_RUN = (
     os.environ.get("JENKINS_URL") or os.environ.get("CI") or os.environ.get("DRONE") is not None
@@ -30,8 +30,8 @@ PIP_INSTALL_SILENT = CI_RUN is False
 SKIP_REQUIREMENTS_INSTALL = os.environ.get("SKIP_REQUIREMENTS_INSTALL", "0") == "1"
 EXTRA_REQUIREMENTS_INSTALL = os.environ.get("EXTRA_REQUIREMENTS_INSTALL")
 
-COVERAGE_REQUIREMENT = os.environ.get("COVERAGE_REQUIREMENT") or "coverage==7.5.1"
-SALT_REQUIREMENT = os.environ.get("SALT_REQUIREMENT") or "salt>=3005"
+COVERAGE_REQUIREMENT = os.environ.get("COVERAGE_REQUIREMENT") or "coverage==7.6.1"
+SALT_REQUIREMENT = os.environ.get("SALT_REQUIREMENT") or "salt>=3006"
 if SALT_REQUIREMENT == "salt==master":
     SALT_REQUIREMENT = "git+https://github.com/saltstack/salt.git@master"
 

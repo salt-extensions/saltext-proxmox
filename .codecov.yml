@@ -1,0 +1,25 @@
+---
+coverage:
+  status:
+    project:
+      default: false
+      app:
+        informational: true
+        paths:
+          - src/
+      tests:
+        informational: true
+        paths:
+          - tests/
+    patch:
+      default: false
+      app:
+        informational: true
+        paths:
+          - src/
+      tests:
+        informational: true
+        paths:
+          - tests/
+github_checks:
+  annotations: false

@@ -1,0 +1,54 @@
+---
+name: Deploy Salt Extension Python Package
+
+on:
+  workflow_call:
+    inputs:
+      test:
+        type: boolean
+        required: false
+        default: true
+      version:
+        type: string
+        required: true
+    secrets:
+      PYPI_API_TOKEN:
+        required: false
+      TEST_PYPI_API_TOKEN:
+        required: false
+
+jobs:
+  build:
+    name: Publish Python Package to ${{ fromJSON('["PyPI", "Test PyPI"]')[inputs.test] }}
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download Python Package Artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4.1.8
+        with:
+          name: salt-extension-${{ inputs.version }}-packages
+          path: dist
+
+      - name: Publish distribution to Test PyPI
+        uses: pypa/gh-action-pypi-publish@c44d2f0e52f028349e3ecafbf7f32561da677277  # v1.10.3
+        if: ${{ inputs.test }}
+        with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.test }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${GITHUB_REPOSITORY#*/} ${{ inputs.version }}" \
+              --generate-notes \
+              dist/*
+
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@c44d2f0e52f028349e3ecafbf7f32561da677277  # v1.10.3
+        if: ${{ !inputs.test }}
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
