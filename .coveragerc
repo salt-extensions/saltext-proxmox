@@ -11,10 +11,7 @@ omit =
 
 [report]
 # Regexes for lines to exclude from consideration
-exclude_lines =
-    # Have to re-enable the standard pragma
-    pragma: no cover
-
+exclude_also =
     # Don't complain about missing debug-only code:
     def __repr__
 
@@ -26,11 +23,16 @@ exclude_lines =
     if 0:
     if False:
     if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @(abc\.)?abstractmethod
+
+    # Add markers which exclude statements in between.
+    # Requires coverage>=7.6.0.
+    no cover: start(?s:.)*?no cover: stop
 
 omit =
   .nox/*
   setup.py
-
 
 ignore_errors = True
 

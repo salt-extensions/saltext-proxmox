@@ -5,7 +5,7 @@ import salt.config
 
 
 @pytest.fixture
-def minion_opts(tmp_path):
+def minion_opts(tmp_path):  # pragma: no cover
     """
     Default minion configuration with relative temporary paths to not
     require root permissions.
@@ -24,7 +24,7 @@ def minion_opts(tmp_path):
 
 
 @pytest.fixture
-def master_opts(tmp_path):
+def master_opts(tmp_path):  # pragma: no cover
     """
     Default master configuration with relative temporary paths to not
     require root permissions.
@@ -43,7 +43,7 @@ def master_opts(tmp_path):
 
 
 @pytest.fixture
-def syndic_opts(tmp_path):
+def syndic_opts(tmp_path):  # pragma: no cover
     """
     Default master configuration with relative temporary paths to not
     require root permissions.

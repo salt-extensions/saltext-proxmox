@@ -1,0 +1,135 @@
+---
+name: CI
+
+on:
+  workflow_call:
+    inputs:
+      deploy-docs:
+        required: false
+        type: boolean
+        default: false
+      release:
+        required: false
+        type: boolean
+        default: false
+      version:
+        required: false
+        type: string
+    secrets:
+      PYPI_API_TOKEN:
+        required: false
+      TEST_PYPI_API_TOKEN:
+        required: false
+
+
+jobs:
+  get-changed-files:
+    name: Get Changed Files
+    uses: ./.github/workflows/get-changed-files.yml
+
+  pre-commit:
+    name: Pre-Commit
+    uses: ./.github/workflows/pre-commit-action.yml
+    needs:
+      - get-changed-files
+    with:
+      changed-files: ${{ needs.get-changed-files.outputs.changed-files }}
+
+  test:
+    name: Test
+    needs:
+      - pre-commit
+    uses: ./.github/workflows/test-action.yml
+
+  docs:
+    name: Docs
+    needs:
+      - pre-commit
+    uses: ./.github/workflows/docs-action.yml
+
+  deploy-docs:
+    name: Deploy Docs
+    uses: ./.github/workflows/deploy-docs-action.yml
+    # Only build doc deployments from the default branch of the repo and never for PRs.
+    if: >-
+      github.event_name != 'pull_request' &&
+      inputs.deploy-docs &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs:
+      - docs
+      - test
+
+  build-python-package:
+    name: Python Package
+    if: ${{ inputs.release && success() }}
+    uses: ./.github/workflows/package-action.yml
+    needs:
+      - pre-commit
+    with:
+      version: "${{ inputs.version }}"
+
+  deploy-python-package-test-pypi:
+    name: Deploy Python Package (Test PyPI)
+    uses: ./.github/workflows/deploy-package-action.yml
+    if: ${{ inputs.release && success() }}
+    needs:
+      - test
+      - docs
+      - build-python-package
+    secrets:
+      TEST_PYPI_API_TOKEN: "${{ secrets.TEST_PYPI_API_TOKEN }}"
+    with:
+      version: "${{ inputs.version }}"
+
+  deploy-python-package:
+    name: Deploy Python Package (PyPI)
+    uses: ./.github/workflows/deploy-package-action.yml
+    if: ${{ inputs.release && success() }}
+    needs:
+      - deploy-python-package-test-pypi
+    secrets:
+      PYPI_API_TOKEN: "${{ secrets.PYPI_API_TOKEN }}"
+    with:
+      test: false
+      version: "${{ inputs.version }}"
+
+  set-pipeline-exit-status:
+    # This step is just so we can make github require this step, to pass checks
+    # on a pull request instead of requiring all
+    name: Set the CI Pipeline Exit Status
+    runs-on: ubuntu-24.04
+    if: always()
+    needs:
+      - test
+      - docs
+      - deploy-docs
+      - build-python-package
+      - deploy-python-package-test-pypi
+      - deploy-python-package
+
+    steps:
+      - name: Download Exit Status Files
+        if: always()
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4.1.8
+        with:
+          path: exitstatus
+          pattern: exitstatus-*
+          merge-multiple: true
+
+      - name: Delete Exit Status Artifacts
+        if: always()
+        uses: geekyeggo/delete-artifact@7ee91e82b4a7f3339cd8b14beace3d826a2aac39  # v5.1.0
+        with:
+          name: exitstatus-*
+          useGlob: true
+          failOnError: false
+
+      - name: Set Pipeline Exit Status
+        run: |
+          tree exitstatus
+          grep -RE 'failure|cancelled' exitstatus/ && exit 1 || exit 0
+
+      - name: Done
+        if: always()
+        run:
+          echo "All workflows finished"

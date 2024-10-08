@@ -1,5 +1,5 @@
-``saltext-proxmox``: Integrate Salt with Proxmox
-================================================
+``saltext-proxmox``: Integrate Salt with Proxmox PVE
+====================================================
 
 Salt Extension for interacting with Proxmox PVE
 
