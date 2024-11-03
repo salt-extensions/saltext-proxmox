@@ -10,8 +10,42 @@ on:
   pull_request:
 
 jobs:
+  # After merging the release PR, we don't want to trigger
+  # this workflow in addition to the Tagged Releases one.
+  # This pauses CI on pushes to the main branch completely.
+  check_release_in_progress:
+    name: Skip CI While Releasing
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push'
+    outputs:
+      count: ${{ steps.workflow_count.outputs.count }}
+
+    steps:
+      - name: Count Running Release Workflows Triggered by Automated PR
+        id: workflow_count
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --event pull_request \
+            --branch release/auto \
+            --workflow 'Tagged Releases' \
+            --json status \
+            --jq 'map(select(.status == ("queued","in_progress"))) | length')"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
   call_central_workflow:
     name: CI
+    needs:
+      - check_release_in_progress
+    if: >
+      always() &&
+      github.event_name != 'push' ||
+      (
+        needs.check_release_in_progress.result == 'success' &&
+        needs.check_release_in_progress.outputs.count == '0'
+      )
     uses: ./.github/workflows/ci.yml
     with:
       deploy-docs: true
@@ -19,4 +53,4 @@ jobs:
       contents: write
       id-token: write
       pages: write
-      pull-requests: read
+      pull-requests: write

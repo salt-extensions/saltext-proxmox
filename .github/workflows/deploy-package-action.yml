@@ -30,7 +30,7 @@ jobs:
           path: dist
 
       - name: Publish distribution to Test PyPI
-        uses: pypa/gh-action-pypi-publish@c44d2f0e52f028349e3ecafbf7f32561da677277  # v1.10.3
+        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f  # v1.11.0
         if: ${{ inputs.test }}
         with:
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
@@ -41,14 +41,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "v${{ inputs.version }}" \
               --repo="$GITHUB_REPOSITORY" \
               --title="${GITHUB_REPOSITORY#*/} ${{ inputs.version }}" \
               --generate-notes \
               dist/*
 
       - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@c44d2f0e52f028349e3ecafbf7f32561da677277  # v1.10.3
+        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f  # v1.11.0
         if: ${{ !inputs.test }}
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}

@@ -59,9 +59,9 @@ repos:
     rev: 32151ac97cbfd7f9dcd22e49516fb32266db45b4  # v3.16.0
     hooks:
       - id: pyupgrade
-        name: Rewrite Code to be Py3.8+
+        name: Rewrite Code to be Py3.9+
         args: [
-          --py38-plus,
+          --py39-plus,
         ]
         exclude: src/saltext/proxmox/version.py
 
@@ -70,25 +70,25 @@ repos:
     hooks:
       - id: isort
         args: [
-          --py 38,
+          --py 39,
         ]
         exclude: src/saltext/proxmox/(__init__|version).py
 
   - repo: https://github.com/psf/black
-    rev: b965c2a5026f8ba399283ba3e01898b012853c79  # 24.8.0
+    rev: 1b2427a2b785cc4aac97c19bb4b9a0de063f9547  # 24.10.0
     hooks:
       - id: black
         args: [-l 100]
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/adamchainz/blacken-docs
-    rev: 4c97c4a0d921007af6fefae92d8447cfbf63720b  # 1.18.0
+    rev: 78a9dcbecf4f755f65d1f3dec556bc249d723600  # 1.19.1
     hooks:
       - id: blacken-docs
         args: [--skip-errors]
         files: ^(docs/.*\.rst|src/saltext/proxmox/.*\.py)$
         additional_dependencies:
-          - black==24.8.0
+          - black==24.10.0
   # <---- Formatting -----------------------------------------------------------------------------
 
   # ----- Security ------------------------------------------------------------------------------>
@@ -123,8 +123,8 @@ repos:
         files: ^((setup|noxfile)|src/.*)\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2024.4.15
-          - uv==0.4.18  # Makes this hook much faster
+          - nox==2024.10.9
+          - uv==0.4.29  # Makes this hook much faster
 
       - id: nox
         alias: lint-tests
@@ -134,8 +134,8 @@ repos:
         files: ^tests/.*\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2024.4.15
-          - uv==0.4.18  # Makes this hook much faster
+          - nox==2024.10.9
+          - uv==0.4.29  # Makes this hook much faster
 
   - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
     rev: 27445053da613c660ed5895d9616662059a53ca7  # v1.7.3.17

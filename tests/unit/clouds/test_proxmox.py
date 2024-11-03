@@ -50,9 +50,11 @@ def test_create(mock__query: MagicMock, mock_start: MagicMock, mock_show_instanc
         },
     }
 
-    with patch("salt.utils.cloud.bootstrap", MagicMock()), patch(
-        "salt.utils.cloud.filter_event", MagicMock()
-    ), patch("salt.utils.cloud.fire_event", MagicMock()):
+    with (
+        patch("salt.utils.cloud.bootstrap", MagicMock()),
+        patch("salt.utils.cloud.filter_event", MagicMock()),
+        patch("salt.utils.cloud.fire_event", MagicMock()),
+    ):
         proxmox.create(create_config)
     mock__query.assert_called_with("POST", "nodes/proxmox-node1/qemu", create_config["create"])
 
@@ -76,9 +78,11 @@ def test_create_with_clone(
         },
     }
 
-    with patch("salt.utils.cloud.bootstrap", MagicMock()), patch(
-        "salt.utils.cloud.filter_event", MagicMock()
-    ), patch("salt.utils.cloud.fire_event", MagicMock()):
+    with (
+        patch("salt.utils.cloud.bootstrap", MagicMock()),
+        patch("salt.utils.cloud.filter_event", MagicMock()),
+        patch("salt.utils.cloud.fire_event", MagicMock()),
+    ):
         proxmox.create(clone_config)
     mock_clone.assert_called()
 
@@ -154,9 +158,11 @@ def test_destroy(mock__query: MagicMock, mock__get_vm_by_name: MagicMock):
         "type": "lxc",
     }
 
-    with patch("salt.utils.cloud.bootstrap", MagicMock()), patch(
-        "salt.utils.cloud.filter_event", MagicMock()
-    ), patch("salt.utils.cloud.fire_event", MagicMock()):
+    with (
+        patch("salt.utils.cloud.bootstrap", MagicMock()),
+        patch("salt.utils.cloud.filter_event", MagicMock()),
+        patch("salt.utils.cloud.fire_event", MagicMock()),
+    ):
         proxmox.destroy(call="action", name="my-proxmox-vm", kwargs=destroy_config)
     mock__query.assert_called_with("DELETE", "nodes/proxmox-node1/lxc/123", destroy_config)
 

@@ -12,21 +12,20 @@ jobs:
 
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 3
       matrix:
         include:
-          - {salt-version: "3006.9", python-version: "3.8"}
           - {salt-version: "3006.9", python-version: "3.9"}
           - {salt-version: "3006.9", python-version: "3.10"}
           - {salt-version: "3007.1", python-version: "3.10"}
 
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 2  # coverage: Issue detecting commit SHA
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3  # v5.2.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -63,7 +62,7 @@ jobs:
           flags: ${{ steps.codecov-flags.outputs.flags }},project
           name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-project
           use_oidc: true
-          version: v0.7.5
+          version: v0.8.0
 
       - name: Upload Tests Code Coverage
         uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673  # v4.5.0
@@ -74,11 +73,11 @@ jobs:
           flags: ${{ steps.codecov-flags.outputs.flags }},tests
           name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-tests
           use_oidc: true
-          version: v0.7.5
+          version: v0.8.0
 
       - name: Upload Logs
         if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874  # v4.4.0
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
           name: runtests-${{ runner.os }}-py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}.log
           path: artifacts/runtests-*.log
@@ -91,7 +90,7 @@ jobs:
 
       - name: Upload Exit Status
         if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874  # v4.4.0
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
           name: exitstatus-${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}
           path: exitstatus
@@ -106,30 +105,18 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - {salt-version: "3006.9", python-version: "3.8"}
-          - {salt-version: "3007.1", python-version: "3.8"}
+          - {salt-version: "3006.9", python-version: "3.9"}
+          - {salt-version: "3007.1", python-version: "3.9"}
 
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 2
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3  # v5.2.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Download libeay32.dll
-        run: |
-          PY_LOC="$(which python.exe)"
-          export PY_LOC
-          echo "${PY_LOC}"
-          PY_DIR="$(dirname "${PY_LOC}")"
-          export PY_DIR
-          echo "${PY_DIR}"
-          curl https://repo.saltproject.io/windows/dependencies/64/libeay32.dll --output "${PY_DIR}/libeay32.dll"
-          ls -l "${PY_DIR}"
-        shell: bash
 
       - name: Install Nox
         run: |
@@ -169,7 +156,7 @@ jobs:
           flags: ${{ steps.codecov-flags.outputs.flags }},project
           name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-project
           use_oidc: true
-          version: v0.7.5
+          version: v0.8.0
 
       - name: Upload Tests Code Coverage
         uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673  # v4.5.0
@@ -180,11 +167,11 @@ jobs:
           flags: ${{ steps.codecov-flags.outputs.flags }},tests
           name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-tests
           use_oidc: true
-          version: v0.7.5
+          version: v0.8.0
 
       - name: Upload Logs
         if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874  # v4.4.0
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
           name: runtests-${{ runner.os }}-py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}.log
           path: artifacts/runtests-*.log
@@ -197,7 +184,7 @@ jobs:
 
       - name: Upload Exit Status
         if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874  # v4.4.0
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
           name: exitstatus-${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}
           path: exitstatus
@@ -212,16 +199,16 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - {salt-version: "3006.9", python-version: "3.9"}
+          - {salt-version: "3006.9", python-version: "3.10"}
           - {salt-version: "3007.1", python-version: "3.10"}
 
     steps:
-      - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 2
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3  # v5.2.0
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -258,7 +245,7 @@ jobs:
           flags: ${{ steps.codecov-flags.outputs.flags }},project
           name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-project
           use_oidc: true
-          version: v0.7.5
+          version: v0.8.0
 
       - name: Upload Tests Code Coverage
         uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673  # v4.5.0
@@ -269,11 +256,11 @@ jobs:
           flags: ${{ steps.codecov-flags.outputs.flags }},tests
           name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-tests
           use_oidc: true
-          version: v0.7.5
+          version: v0.8.0
 
       - name: Upload Logs
         if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874  # v4.4.0
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
           name: runtests-${{ runner.os }}-py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}.log
           path: artifacts/runtests-*.log
@@ -286,7 +273,7 @@ jobs:
 
       - name: Upload Exit Status
         if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874  # v4.4.0
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
           name: exitstatus-${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}
           path: exitstatus
