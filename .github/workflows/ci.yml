@@ -47,13 +47,53 @@ jobs:
       - pre-commit
     uses: ./.github/workflows/docs-action.yml
 
+  check-prepare-release:
+    name: Check if we can prepare release PR
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs:
+      - docs
+      - test
+    runs-on: ubuntu-24.04
+    outputs:
+      news-fragments-available: ${{ steps.check-available.outputs.available }}
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Check if news fragments are available
+        id: check-available
+        run: |
+          if [ -n "$(find changelog -type f -not -name '.*' -print -quit)" ]; then
+            echo "available=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=0" >> "$GITHUB_OUTPUT"
+          fi
+
+  prepare-release:
+    name: Prepare Release PR
+    if: ${{ needs.check-prepare-release.outputs.news-fragments-available == '1' }}
+    needs:
+      - check-prepare-release
+      - docs
+      - test
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/prepare-release-action.yml
+
   deploy-docs:
     name: Deploy Docs
     uses: ./.github/workflows/deploy-docs-action.yml
-    # Only build doc deployments from the default branch of the repo and never for PRs.
+    # Only build doc deployments from the default branch of the repo and never for PRs,
+    # unless the triggering event was the release PR being merged.
     if: >-
-      github.event_name != 'pull_request' &&
       inputs.deploy-docs &&
+      (
+        github.event_name != 'pull_request' ||
+        inputs.release
+      ) &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     needs:
       - docs

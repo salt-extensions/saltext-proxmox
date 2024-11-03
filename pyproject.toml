@@ -25,14 +25,13 @@ classifiers = [
     "Programming Language :: Cython",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
 ]
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 dynamic = ["version"]
 dependencies = [
     "salt>=3006",
@@ -117,6 +116,11 @@ start_string = "# Changelog\n"
 underlines = ["", "", ""]
 title_format = "## {version} ({project_date})"
 issue_format = "[#{issue}](https://github.com/salt-extensions/saltext-proxmox/issues/{issue})"
+
+[[tool.towncrier.type]]
+directory = "breaking"
+name = "Breaking changes"
+showcontent = true
 
 [[tool.towncrier.type]]
 directory = "removed"
