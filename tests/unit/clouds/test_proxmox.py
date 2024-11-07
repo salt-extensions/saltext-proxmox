@@ -29,6 +29,11 @@ def configure_loader_modules():
                 "sock_dir": True,
                 "transport": True,
             },
+            "__utils__": {
+                "cloud.filter_event": MagicMock(),
+                "cloud.fire_event": MagicMock(),
+                "cloud.bootstrap": MagicMock(),
+            },
             "__active_provider_name__": "",
         }
     }
