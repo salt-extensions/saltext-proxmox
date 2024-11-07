@@ -16,8 +16,6 @@ import logging
 import time
 from ipaddress import ip_interface
 
-import salt.utils.cloud
-import salt.utils.json
 from salt import config
 from salt.exceptions import SaltCloudExecutionTimeout
 from salt.exceptions import SaltCloudNotFound
@@ -79,11 +77,11 @@ def create(vm_):
     """
     Create a single Proxmox VM.
     """
-    salt.utils.cloud.fire_event(
+    __utils__["cloud.fire_event"](  # pylint: disable=undefined-variable
         "event",
         "starting create",
-        "salt/cloud/{}/creating".format(vm_["name"]),  # pylint: disable=consider-using-f-string
-        args=salt.utils.cloud.filter_event(
+        f"salt/cloud/{vm_['name']}/creating",
+        args=__utils__["cloud.filter_event"](  # pylint: disable=undefined-variable
             "creating", vm_, ["name", "profile", "provider", "driver"]
         ),
         sock_dir=__opts__["sock_dir"],
@@ -104,15 +102,15 @@ def create(vm_):
 
     # cloud.bootstrap expects the ssh_password to be set in vm_["password"]
     vm_["password"] = vm_.get("ssh_password")
-    ret = salt.utils.cloud.bootstrap(vm_, __opts__)
+    ret = __utils__["cloud.bootstrap"](vm_, __opts__)  # pylint: disable=undefined-variable
 
     ret.update(show_instance(call="action", name=vm_["name"]))
 
-    salt.utils.cloud.fire_event(
+    __utils__["cloud.fire_event"](  # pylint: disable=undefined-variable
         "event",
         "created instance",
         f"salt/cloud/{vm_['name']}/created",
-        args=salt.utils.cloud.filter_event(
+        args=__utils__["cloud.filter_event"](  # pylint: disable=undefined-variable
             "created", vm_, ["name", "profile", "provider", "driver"]
         ),
         sock_dir=__opts__["sock_dir"],
@@ -214,7 +212,7 @@ def destroy(name=None, kwargs=None, call=None):
             "The destroy action must be called with -d, --destroy, -a or --action."
         )
 
-    salt.utils.cloud.fire_event(
+    __utils__["cloud.fire_event"](  # pylint: disable=undefined-variable
         "event",
         "destroying instance",
         f"salt/cloud/{name}/destroying",
@@ -227,7 +225,7 @@ def destroy(name=None, kwargs=None, call=None):
 
     _query("DELETE", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}", kwargs)
 
-    salt.utils.cloud.fire_event(
+    __utils__["cloud.fire_event"](  # pylint: disable=undefined-variable
         "event",
         "destroyed instance",
         f"salt/cloud/{name}/destroyed",
@@ -372,7 +370,7 @@ def list_nodes_select(call=None):
     """
     Return a list of the VMs that are managed by the provder, with select fields
     """
-    return salt.utils.cloud.list_nodes_select(
+    return __utils__["cloud.list_nodes_select"](  # pylint: disable=undefined-variable
         list_nodes_full(),
         __opts__["query.selection"],
         call,
