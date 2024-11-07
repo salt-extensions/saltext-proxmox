@@ -4,6 +4,14 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
+## 2.0.1 (2024-11-07)
+
+
+### Fixed
+
+- Fixed profile error: name '__opts__' is not defined [#45](https://github.com/salt-extensions/saltext-proxmox/issues/45)
+
+
 ## v2.0.0 (2024-08-08)
 
 
