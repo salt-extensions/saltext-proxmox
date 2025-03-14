@@ -19,20 +19,21 @@ on:
 
 jobs:
   build:
-    name: Publish Python Package to ${{ fromJSON('["PyPI", "Test PyPI"]')[inputs.test] }}
+    name: Publish Python Package to ${{ ! inputs.test && 'PyPI' || 'Test PyPI' }}
     runs-on: ubuntu-24.04
 
     steps:
       - name: Download Python Package Artifacts
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16  # v4.1.8
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806  # v4.1.9
         with:
           name: salt-extension-${{ inputs.version }}-packages
           path: dist
 
       - name: Publish distribution to Test PyPI
-        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f  # v1.11.0
+        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011  # v1.12.4
         if: ${{ inputs.test }}
         with:
+          attestations: false
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
 
@@ -48,7 +49,12 @@ jobs:
               dist/*
 
       - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f  # v1.11.0
+        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011  # v1.12.4
         if: ${{ !inputs.test }}
         with:
+          # Attestations are only submitted when using Trusted Publishing,
+          # which is triggered by secrets.PYPI_API_TOKEN not being set.
+          # They don't work with reusable workflows at the moment.
+          # It's related to https://github.com/pypi/warehouse/issues/11096
+          attestations: false
           password: ${{ secrets.PYPI_API_TOKEN }}

@@ -1,3 +1,4 @@
+import os
 import platform
 import sys
 
@@ -17,11 +18,13 @@ def ensure_utf8():
             stream.reconfigure(encoding="utf-8")
 
 
-def pprint(msg, bold=False, fg=None, bg=None, stream=None):
+def pprint(msg, bold=False, fg=None, bg=None, stream=None, force_print=False):
     """
     Ugly helper for printing a bit more fancy output.
     Stand-in for questionary/prompt_toolkit.
     """
+    if not force_print and os.getenv("TOOLS_SILENT"):
+        return
     out = ""
     if bold:
         out += "\033[1m"
@@ -46,6 +49,6 @@ def status(msg, message=None):
 
 def warn(header, message=None):
     out = f"\n{header}"
-    pprint(out, bold=True, bg=DARKRED, stream=sys.stderr)
+    pprint(out, bold=True, bg=DARKRED, stream=sys.stderr, force_print=True)
     if message:
-        pprint(message, stream=sys.stderr)
+        pprint(message, stream=sys.stderr, force_print=True)

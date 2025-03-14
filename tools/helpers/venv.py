@@ -47,13 +47,12 @@ def create_venv(project_root=".", directory=None):
         prompt.status("Found `uv`. Creating venv")
         uv(
             "venv",
+            # Install pip/setuptools/wheel for compatibility
+            "--seed",
             "--python",
             RECOMMENDED_PYVER,
             f"--prompt=saltext-{discover_project_name()}",
         )
-        prompt.status("Installing pip into venv")
-        # Ensure there's still a `pip` (+ setuptools/wheel) inside the venv for compatibility
-        uv("venv", "--seed")
     else:
         prompt.status("Did not find `uv`. Falling back to `venv`")
         try:
@@ -69,7 +68,7 @@ def create_venv(project_root=".", directory=None):
     return venv
 
 
-def ensure_project_venv(project_root=".", reinstall=True):
+def ensure_project_venv(project_root=".", reinstall=True, install_extras=False):
     exists = False
     try:
         venv = discover_venv(project_root)
@@ -79,17 +78,20 @@ def ensure_project_venv(project_root=".", reinstall=True):
         venv = create_venv(project_root)
     if not reinstall:
         return venv
+    extras = ["dev", "tests", "docs"]
+    if install_extras:
+        extras.append("dev_extra")
     prompt.status(("Reinstalling" if exists else "Installing") + " project and dependencies")
     with local.venv(venv):
         if uv is not None:
-            uv("pip", "install", "-e", ".[dev,tests,docs]")
+            uv("pip", "install", "-e", f".[{','.join(extras)}]")
         else:
             try:
                 # We install uv into the virtualenv, so it might be available now.
                 # It speeds up this step a lot.
-                local["uv"]("pip", "install", "-e", ".[dev,tests,docs]")
+                local["uv"]("pip", "install", "-e", f".[{','.join(extras)}]")
             except CommandNotFound:
-                local["python"]("-m", "pip", "install", "-e", ".[dev,tests,docs]")
+                local["python"]("-m", "pip", "install", "-e", f".[{','.join(extras)}]")
         if not exists or not (Path(project_root) / ".git" / "hooks" / "pre-commit").exists():
             prompt.status("Installing pre-commit hooks")
             local["python"]("-m", "pre_commit", "install", "--install-hooks")

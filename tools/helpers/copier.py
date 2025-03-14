@@ -101,7 +101,7 @@ def finish_task(msg, success, err_exit=False, extra=None):
     We usually want to exit with 0, even when something fails,
     because a failing task/migration should not crash Copier.
     """
-    print("\n", file=sys.stderr)
+    prompt.pprint("\n", stream=sys.stderr)
     if success:
         prompt.pprint(f"\n    ✓ {msg}", bold=True, bg=prompt.DARKGREEN, stream=sys.stderr)
     elif success is None:
