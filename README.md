@@ -33,13 +33,13 @@ cd saltext-proxmox
 ```
 
 #### Automatic
-If you have installed [direnv][direnv], allowing the project's `.envrc` ensures
-a proper development environment is present and the virtual environment is active.
+If you have installed [direnv][direnv], copying the included `.envrc.example` to `.envrc` and
+allowing it to run ensures a proper development environment is present and the virtual environment is active.
 
 Without `direnv`, you can still run the automation explicitly:
 
 ```bash
-python3 tools/initialize.py
+make dev  # or python3 tools/initialize.py
 source .venv/bin/activate
 ```
 
@@ -53,6 +53,10 @@ Always make changes in a feature branch:
 ```bash
 git switch -c my-feature-branch
 ```
+
+Please ensure you include a [news fragment](https://salt-extensions.github.io/salt-extension-copier/topics/documenting/changelog.html#procedure)
+describing your changes. This is a requirement for all user-facing changes (bug fixes, new features),
+with the exception of documentation changes.
 
 To [submit a Pull Request][submitting-pr], you'll need a fork of this repository in
 your own GitHub account. If you followed the instructions above,

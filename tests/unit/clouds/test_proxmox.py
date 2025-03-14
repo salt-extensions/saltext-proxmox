@@ -1,5 +1,5 @@
 """
-    :codeauthor: Bernhard Gally <github.com/I3urny>
+:codeauthor: Bernhard Gally <github.com/I3urny>
 """
 
 import io
