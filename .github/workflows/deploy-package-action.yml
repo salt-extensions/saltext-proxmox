@@ -30,7 +30,7 @@ jobs:
           path: dist
 
       - name: Publish distribution to Test PyPI
-        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011  # v1.12.4
+        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f # v1.11.0
         if: ${{ inputs.test }}
         with:
           attestations: false
@@ -49,7 +49,7 @@ jobs:
               dist/*
 
       - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011  # v1.12.4
+        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f # v1.11.0
         if: ${{ !inputs.test }}
         with:
           # Attestations are only submitted when using Trusted Publishing,
