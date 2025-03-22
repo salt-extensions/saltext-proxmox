@@ -87,6 +87,11 @@ tests = [
 [project.entry-points."salt.loader"]
 "saltext.proxmox" = "saltext.proxmox"
 
+[tool.uv]
+# Salt's legacy setup.py requires old setuptools.
+# Since uv 0.6.0, it does not fall back to reading requirements from egg-info.
+build-constraint-dependencies = ["setuptools<69"]
+
 [tool.setuptools]
 zip-safe = false
 include-package-data = true
