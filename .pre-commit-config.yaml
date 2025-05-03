@@ -124,7 +124,7 @@ repos:
         require_serial: true
         additional_dependencies:
           - nox==2025.2.9
-          - uv==0.6.10  # Makes this hook much faster
+          - uv==0.6.15  # Makes this hook much faster
 
       - id: nox
         alias: lint-tests
@@ -135,7 +135,7 @@ repos:
         require_serial: true
         additional_dependencies:
           - nox==2025.2.9
-          - uv==0.6.10  # Makes this hook much faster
+          - uv==0.6.15  # Makes this hook much faster
 
   - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
     rev: a185be0fd5b45112845b700d91b81050c75579e2  # v1.7.7.23

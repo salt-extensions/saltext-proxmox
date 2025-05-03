@@ -31,7 +31,7 @@ PIP_INSTALL_SILENT = CI_RUN is False
 SKIP_REQUIREMENTS_INSTALL = os.environ.get("SKIP_REQUIREMENTS_INSTALL", "0") == "1"
 EXTRA_REQUIREMENTS_INSTALL = os.environ.get("EXTRA_REQUIREMENTS_INSTALL")
 
-COVERAGE_REQUIREMENT = os.environ.get("COVERAGE_REQUIREMENT") or "coverage==7.7.1"
+COVERAGE_REQUIREMENT = os.environ.get("COVERAGE_REQUIREMENT") or "coverage==7.8.0"
 SALT_REQUIREMENT = os.environ.get("SALT_REQUIREMENT") or "salt>=3006"
 if SALT_REQUIREMENT == "salt==master":
     SALT_REQUIREMENT = "git+https://github.com/saltstack/salt.git@master"
@@ -98,7 +98,20 @@ def _install_requirements(
             session.install(no_progress, COVERAGE_REQUIREMENT, silent=PIP_INSTALL_SILENT)
 
         if install_salt:
-            session.install(no_progress, SALT_REQUIREMENT, silent=PIP_INSTALL_SILENT)
+            # Salt does not publish wheels and setuptools 75.6.0+ breaks requirements inclusion during builds,
+            # so we need to constrain setuptools in the build environment. uv reads this from
+            # pyproject.toml, but pip has no equivalent behavior.
+            # We need delete=False for Windows. delete_on_close would work, but is Python 3.12+ only.
+            with tempfile.NamedTemporaryFile(delete=False) as constraints_file:
+                setuptools_constraint = "setuptools<75.6.0"
+                constraints_file.write(setuptools_constraint.encode())
+            env = {
+                "PIP_CONSTRAINT": constraints_file.name,
+            }
+            try:
+                session.install(no_progress, SALT_REQUIREMENT, silent=PIP_INSTALL_SILENT, env=env)
+            finally:
+                os.unlink(constraints_file.name)
 
         if install_test_requirements:
             install_extras.append("tests")

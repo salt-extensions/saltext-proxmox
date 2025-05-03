@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 
 from . import prompt
@@ -91,7 +92,16 @@ def ensure_project_venv(project_root=".", reinstall=True, install_extras=False):
                 # It speeds up this step a lot.
                 local["uv"]("pip", "install", "-e", f".[{','.join(extras)}]")
             except CommandNotFound:
-                local["python"]("-m", "pip", "install", "-e", f".[{','.join(extras)}]")
+                # Salt does not build correctly with setuptools >= 75.6.0.
+                # uv reads this constraint from pyproject.toml, but pip needs this workaround.
+                with tempfile.NamedTemporaryFile(delete=False) as constraints_file:
+                    setuptools_constraint = "setuptools<75.6.0"
+                    constraints_file.write(setuptools_constraint.encode())
+                try:
+                    with local.env(PIP_CONSTRAINT=constraints_file.name):
+                        local["python"]("-m", "pip", "install", "-e", f".[{','.join(extras)}]")
+                finally:
+                    Path(constraints_file.name).unlink()
         if not exists or not (Path(project_root) / ".git" / "hooks" / "pre-commit").exists():
             prompt.status("Installing pre-commit hooks")
             local["python"]("-m", "pre_commit", "install", "--install-hooks")
