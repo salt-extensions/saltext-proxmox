@@ -565,7 +565,7 @@ def _get_api_token():
     token = config.get_cloud_config_value(
         "token", get_configured_provider(), __opts__, search_global=False
     )
-    return f"{username}!{token}"
+    return f"{username}!TOKENID={token}"
 
 
 def _get_vm_by_name(name):
