@@ -38,6 +38,15 @@ jobs:
                 - .pre-commit-config.y?(a)ml
                 - .pylintrc
                 - pyproject.toml
+            # If files in this filter change, a test release to TestPyPI
+            # should be attempted. This is currently not implemented yet.
+            release:
+              - added|modified|deleted:
+                - .copier-answers.y?(a)ml
+                - .github/workflows/**
+                - CHANGELOG.md
+                - pyproject.toml
+                - setup.py
 
       - name: Echo Changed Files Output
         run: echo "${{ toJSON(steps.changed-files.outputs) }}"

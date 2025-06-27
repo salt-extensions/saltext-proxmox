@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import platform
 import shutil
 import sys
 import tempfile
@@ -30,7 +31,7 @@ PIP_INSTALL_SILENT = CI_RUN is False
 SKIP_REQUIREMENTS_INSTALL = os.environ.get("SKIP_REQUIREMENTS_INSTALL", "0") == "1"
 EXTRA_REQUIREMENTS_INSTALL = os.environ.get("EXTRA_REQUIREMENTS_INSTALL")
 
-COVERAGE_REQUIREMENT = os.environ.get("COVERAGE_REQUIREMENT") or "coverage==7.6.4"
+COVERAGE_REQUIREMENT = os.environ.get("COVERAGE_REQUIREMENT") or "coverage==7.8.0"
 SALT_REQUIREMENT = os.environ.get("SALT_REQUIREMENT") or "salt>=3006"
 if SALT_REQUIREMENT == "salt==master":
     SALT_REQUIREMENT = "git+https://github.com/saltstack/salt.git@master"
@@ -97,7 +98,20 @@ def _install_requirements(
             session.install(no_progress, COVERAGE_REQUIREMENT, silent=PIP_INSTALL_SILENT)
 
         if install_salt:
-            session.install(no_progress, SALT_REQUIREMENT, silent=PIP_INSTALL_SILENT)
+            # Salt does not publish wheels and setuptools 75.6.0+ breaks requirements inclusion during builds,
+            # so we need to constrain setuptools in the build environment. uv reads this from
+            # pyproject.toml, but pip has no equivalent behavior.
+            # We need delete=False for Windows. delete_on_close would work, but is Python 3.12+ only.
+            with tempfile.NamedTemporaryFile(delete=False) as constraints_file:
+                setuptools_constraint = "setuptools<75.6.0"
+                constraints_file.write(setuptools_constraint.encode())
+            env = {
+                "PIP_CONSTRAINT": constraints_file.name,
+            }
+            try:
+                session.install(no_progress, SALT_REQUIREMENT, silent=PIP_INSTALL_SILENT, env=env)
+            finally:
+                os.unlink(constraints_file.name)
 
         if install_test_requirements:
             install_extras.append("tests")
@@ -399,6 +413,25 @@ def lint_tests_pre_commit(session):
     _lint_pre_commit(session, ".pylintrc", flags, paths)
 
 
+def _get_docs_env(session):
+    env = {}
+    if not os.getenv("PYENCHANT_LIBRARY_PATH"):
+        if sys.platform == "darwin" and platform.processor() == "arm":
+            try:
+                # Ensure docs build works on Apple Silicon, where the default
+                # Homebrew lib path is not autodiscovered.
+                # Needs `brew install enchant`.
+                env["PYENCHANT_LIBRARY_PATH"] = str(
+                    next(Path("/opt/homebrew/lib").glob("libenchant*.dylib"))
+                )
+            except StopIteration:
+                session.warn(
+                    "Failed to autodiscover enchant library. Ensure it's installed (e.g. brew install enchant). "
+                    "If it's installed, set the PYENCHANT_LIBRARY_PATH environment variable to its dylib path."
+                )
+    return env
+
+
 @nox.session(python="3")
 def docs(session):
     """
@@ -412,16 +445,17 @@ def docs(session):
         install_extras=["docs"],
     )
     os.chdir("docs/")
+    env = _get_docs_env(session)
     session.run("make", "clean", external=True)
-    session.run("make", "linkcheck", "SPHINXOPTS=-W", external=True)
-    session.run("make", "coverage", "SPHINXOPTS=-W", external=True)
+    session.run("make", "linkcheck", "SPHINXOPTS=-W", external=True, env=env)
+    session.run("make", "coverage", "SPHINXOPTS=-W", external=True, env=env)
     docs_coverage_file = os.path.join("_build", "html", "python.txt")
     if os.path.exists(docs_coverage_file):
         with open(docs_coverage_file) as rfh:  # pylint: disable=unspecified-encoding
             contents = rfh.readlines()[2:]
             if contents:
                 session.error("\n" + "".join(contents))
-    session.run("make", "html", "SPHINXOPTS=-W", external=True)
+    session.run("make", "html", "SPHINXOPTS=-W", external=True, env=env)
     os.chdir(str(REPO_ROOT))
 
 
@@ -455,7 +489,8 @@ def docs_dev(session):
     if build_dir.exists():
         shutil.rmtree(build_dir)
 
-    session.run("sphinx-autobuild", *args)
+    env = _get_docs_env(session)
+    session.run("sphinx-autobuild", *args, env=env)
 
 
 @nox.session(name="docs-crosslink-info", python="3")
