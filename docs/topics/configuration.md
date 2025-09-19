@@ -7,7 +7,7 @@ Set up the cloud configuration at `/etc/salt/cloud.providers` or `/etc/salt/clou
 my-proxmox-config:
   # Required parameters
   user: myuser@pam  # or myuser@pve
-  token: myapitoken
+  token: "token_name=myapitoken"
   url: https://hypervisor.domain.tld:8006
   driver: proxmox
 ```
