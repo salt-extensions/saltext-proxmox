@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
 
       - name: Extract tag name
         id: get_version_tag
@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Find Pull Request
-        uses: juliangruber/find-pull-request-action@2f36c5fe1abfda4745dfab4f38217ebad8ded4eb  # v1.9.0
+        uses: juliangruber/find-pull-request-action@20b962e58a4abbc0dc63bcc0fde0c997de8782b5  # v1.10.0
         id: find-pull-request
         with:
           branch: release/auto
@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
 
       - name: Extract version of merged release PR
         id: get_version_pr
