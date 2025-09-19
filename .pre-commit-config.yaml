@@ -2,7 +2,7 @@
 minimum_pre_commit_version: 2.4.0
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
     hooks:
       - id: check-merge-conflict   # Check for files that contain merge conflict strings.
         args: [--assume-in-merge]
@@ -56,7 +56,7 @@ repos:
         args: [--silent, -E, fix_docstrings]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: ce40a160603ab0e7d9c627ae33d7ef3906e2d2b2  # v3.19.1
+    rev: 37bfa06d791fd38fb4e54910b36a2ff57641b074  # v3.20.0
     hooks:
       - id: pyupgrade
         name: Rewrite Code to be Py3.9+
@@ -82,7 +82,7 @@ repos:
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/adamchainz/blacken-docs
-    rev: 78a9dcbecf4f755f65d1f3dec556bc249d723600  # 1.19.1
+    rev: dda8db18cfc68df532abf33b185ecd12d5b7b326  # 1.20.0
     hooks:
       - id: blacken-docs
         args: [--skip-errors]
@@ -93,7 +93,7 @@ repos:
 
   # ----- Security ------------------------------------------------------------------------------>
   - repo: https://github.com/PyCQA/bandit
-    rev: 8ff25e07e487f143571cc305e56dd0253c60bc7b  # 1.8.3
+    rev: 2d0b675b04c80ae42277e10500db06a0a37bae17  # 1.8.6
     hooks:
       - id: bandit
         alias: bandit-salt
@@ -102,7 +102,7 @@ repos:
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 8ff25e07e487f143571cc305e56dd0253c60bc7b  # 1.8.3
+    rev: 2d0b675b04c80ae42277e10500db06a0a37bae17  # 1.8.6
     hooks:
       - id: bandit
         alias: bandit-tests
@@ -123,8 +123,8 @@ repos:
         files: ^((setup|noxfile)|src/.*)\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2025.2.9
-          - uv==0.6.15  # Makes this hook much faster
+          - nox==2025.5.1
+          - uv==0.8.18  # Makes this hook much faster
 
       - id: nox
         alias: lint-tests
@@ -134,13 +134,13 @@ repos:
         files: ^tests/.*\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2025.2.9
-          - uv==0.6.15  # Makes this hook much faster
+          - nox==2025.5.1
+          - uv==0.8.18  # Makes this hook much faster
 
   - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
-    rev: a185be0fd5b45112845b700d91b81050c75579e2  # v1.7.7.23
+    rev: f999ae59ac949d9b57aaa5569c2d60eb846b3a00  # v1.7.7.24
     hooks:
       - id: actionlint
         additional_dependencies:
-          - shellcheck-py==0.10.0.1
+          - shellcheck-py==0.11.0.1
   # <---- Code Analysis --------------------------------------------------------------------------

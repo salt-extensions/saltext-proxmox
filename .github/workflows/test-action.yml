@@ -15,17 +15,17 @@ jobs:
       max-parallel: 3
       matrix:
         include:
-          - {salt-version: "3006.10", python-version: "3.9"}
-          - {salt-version: "3006.10", python-version: "3.10"}
-          - {salt-version: "3007.1", python-version: "3.10"}
+          - {salt-version: "3006.15", python-version: "3.9"}
+          - {salt-version: "3006.15", python-version: "3.10"}
+          - {salt-version: "3007.7", python-version: "3.10"}
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
           fetch-depth: 2  # coverage: Issue detecting commit SHA
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -34,8 +34,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install "nox==$NOX_VERSION" "uv==$UV_VERSION"
         env:
-          NOX_VERSION: '2025.2.9'
-          UV_VERSION: '0.6.15'
+          NOX_VERSION: '2025.5.1'
+          UV_VERSION: '0.8.18'
 
       - name: Install Test Requirements
         env:
@@ -57,7 +57,7 @@ jobs:
           echo "flags=$(python -c "import sys; print('{},{},salt_{}'.format('${{ runner.os }}'.replace('-latest', ''), 'py{}{}'.format(*sys.version_info), '_'.join(str(v) for v in '${{ matrix.salt-version }}'.replace('==', '_').split('.'))))")" >> "$GITHUB_OUTPUT"
 
       - name: Upload Project Code Coverage
-        uses: codecov/codecov-action@1f60566a86da84c4b4b64c17662a90de97fbb8d7  # v5.4.2
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f  # v5.5.1
         with:
           files: artifacts/coverage-project.xml
           disable_search: true
@@ -68,7 +68,7 @@ jobs:
           version: v10.4.0
 
       - name: Upload Tests Code Coverage
-        uses: codecov/codecov-action@1f60566a86da84c4b4b64c17662a90de97fbb8d7  # v5.4.2
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f  # v5.5.1
         with:
           files: artifacts/coverage-tests.xml
           disable_search: true
@@ -100,7 +100,7 @@ jobs:
           if-no-files-found: error
 
   Windows:
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 40
 
     strategy:
@@ -108,16 +108,16 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - {salt-version: "3006.10", python-version: "3.9"}
-          - {salt-version: "3007.1", python-version: "3.9"}
+          - {salt-version: "3006.15", python-version: "3.9"}
+          - {salt-version: "3007.7", python-version: "3.9"}
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
           fetch-depth: 2
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -126,8 +126,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install "nox==$env:NOX_VERSION" "uv==$env:UV_VERSION"
         env:
-          NOX_VERSION: '2025.2.9'
-          UV_VERSION: '0.6.15'
+          NOX_VERSION: '2025.5.1'
+          UV_VERSION: '0.8.18'
 
       - name: Install Test Requirements
         shell: bash
@@ -154,7 +154,7 @@ jobs:
           echo "flags=$(python -c "import sys; print('{},{},salt_{}'.format('${{ runner.os }}'.replace('-latest', ''), 'py{}{}'.format(*sys.version_info), '_'.join(str(v) for v in '${{ matrix.salt-version }}'.replace('==', '_').split('.'))))")" >> "$GITHUB_OUTPUT"
 
       - name: Upload Project Code Coverage
-        uses: codecov/codecov-action@1f60566a86da84c4b4b64c17662a90de97fbb8d7  # v5.4.2
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f  # v5.5.1
         with:
           files: artifacts/coverage-project.xml
           disable_search: true
@@ -165,7 +165,7 @@ jobs:
           version: v10.4.0
 
       - name: Upload Tests Code Coverage
-        uses: codecov/codecov-action@1f60566a86da84c4b4b64c17662a90de97fbb8d7  # v5.4.2
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f  # v5.5.1
         with:
           files: artifacts/coverage-tests.xml
           disable_search: true
@@ -205,16 +205,16 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - {salt-version: "3006.10", python-version: "3.10"}
-          - {salt-version: "3007.1", python-version: "3.10"}
+          - {salt-version: "3006.15", python-version: "3.10"}
+          - {salt-version: "3007.7", python-version: "3.10"}
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
           fetch-depth: 2
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -223,8 +223,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install "nox==$NOX_VERSION" "uv==$UV_VERSION"
         env:
-          NOX_VERSION: '2025.2.9'
-          UV_VERSION: '0.6.15'
+          NOX_VERSION: '2025.5.1'
+          UV_VERSION: '0.8.18'
 
       - name: Install Test Requirements
         env:
@@ -246,7 +246,7 @@ jobs:
           echo "flags=$(python -c "import sys; print('{},{},salt_{}'.format('${{ runner.os }}'.replace('-latest', ''), 'py{}{}'.format(*sys.version_info), '_'.join(str(v) for v in '${{ matrix.salt-version }}'.replace('==', '_').split('.'))))")" >> "$GITHUB_OUTPUT"
 
       - name: Upload Project Code Coverage
-        uses: codecov/codecov-action@1f60566a86da84c4b4b64c17662a90de97fbb8d7  # v5.4.2
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f  # v5.5.1
         with:
           files: artifacts/coverage-project.xml
           disable_search: true
@@ -257,7 +257,7 @@ jobs:
           version: v10.4.0
 
       - name: Upload Tests Code Coverage
-        uses: codecov/codecov-action@1f60566a86da84c4b4b64c17662a90de97fbb8d7  # v5.4.2
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f  # v5.5.1
         with:
           files: artifacts/coverage-tests.xml
           disable_search: true
