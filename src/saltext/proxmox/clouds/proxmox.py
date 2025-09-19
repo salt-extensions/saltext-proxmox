@@ -677,12 +677,13 @@ def _parse_ips(vm_config, vm_type):
     for ip_config in ip_configs:
         try:
             ip_with_netmask = _stringlist_to_dictionary(ip_config).get("ip")
-            ip = ip_interface(ip_with_netmask).ip
+            if ip_with_netmask != "dhcp":
+                ip = ip_interface(ip_with_netmask).ip
 
-            if ip.is_private:
-                private_ips.append(str(ip))
-            else:
-                public_ips.append(str(ip))
+                if ip.is_private:
+                    private_ips.append(str(ip))
+                else:
+                    public_ips.append(str(ip))
         except ValueError:
             log.error("Ignoring '%s' because it is not a valid IP", ip_with_netmask)
 
