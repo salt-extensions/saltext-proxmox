@@ -30,8 +30,8 @@ class ProcessResult:
     """
 
     retcode: int
-    stdout: Union[str, bytes]
-    stderr: Union[str, bytes]
+    stdout: str | bytes
+    stderr: str | bytes
     argv: tuple
 
     def check(self, retcode=None):
@@ -200,7 +200,7 @@ class Command:
     A command object, can be instantiated directly. Does not follow ``Local``.
     """
 
-    exe: Union[Executable, str]
+    exe: Executable | str
     args: tuple[str, ...] = ()
 
     def __post_init__(self):
@@ -275,10 +275,7 @@ class LocalCommand(Command):
     Command returned by Local()["some_command"]. Follows local contexts.
     """
 
-    if sys.version_info >= (3, 10):
-        _local: Local = field(kw_only=True, repr=False, default=local)
-    else:
-        _local: Local = field(repr=False, default=local)
+    _local: Local = field(kw_only=True, repr=False, default=local)
 
     def _which(self, exe):
         return shutil.which(exe, path=self._local._env.get("PATH", ""))
