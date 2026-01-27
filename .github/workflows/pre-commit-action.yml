@@ -14,7 +14,7 @@ jobs:
     name: Pre-Commit
     runs-on: ubuntu-24.04
     container:
-      image: 'docker.io/library/python:3.10.18-slim-bookworm@sha256:e7eed6c2e7fd1ecc43f0a37da7a115f4c9c9f50f247e9cba086c2f4583412fd9'
+      image: 'docker.io/library/python:3.10.19-slim-bookworm@sha256:ac7bf2ae912299e41783a8e4eff07369dc6de3444bdc1cc29626a05241f957d7'
 
     steps:
       - name: Install System Deps
@@ -23,7 +23,7 @@ jobs:
           apt-get install -y enchant-2 git gcc make zlib1g-dev libc-dev libffi-dev g++ libxml2 libxml2-dev libxslt-dev libcurl4-openssl-dev libssl-dev libgnutls28-dev
           git config --global --add safe.directory "$(pwd)"
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Install Pre-Commit
         run: |
@@ -49,7 +49,7 @@ jobs:
 
       - name: Upload Exit Status
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         with:
           name: exitstatus-${{ github.job }}
           path: exitstatus

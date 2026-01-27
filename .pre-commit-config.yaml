@@ -56,26 +56,26 @@ repos:
         args: [--silent, -E, fix_docstrings]
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: 37bfa06d791fd38fb4e54910b36a2ff57641b074  # v3.20.0
+    rev: 75992aaa40730136014f34227e0135f63fc951b4  # v3.21.2
     hooks:
       - id: pyupgrade
-        name: Rewrite Code to be Py3.9+
+        name: Rewrite Code to be Py3.10+
         args: [
-          --py39-plus,
+          --py310-plus,
         ]
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/PyCQA/isort
-    rev: c8ab4a5b21bac924d106e3103dd7c979fdd0f9bc  # 6.0.1
+    rev: 0a09c783808cfe77bb3269250f663ff733d23302  # 7.0.0
     hooks:
       - id: isort
         args: [
-          --py 39,
+          --py 310,
         ]
         exclude: src/saltext/proxmox/(__init__|version).py
 
   - repo: https://github.com/psf/black
-    rev: 8a737e727ac5ab2f1d4cf5876720ed276dc8dc4b  # 25.1.0
+    rev: 6305bf1ae645ab7541be4f5028a86239316178eb  # 26.1.0
     hooks:
       - id: black
         args: [-l 100]
@@ -88,12 +88,12 @@ repos:
         args: [--skip-errors]
         files: ^(docs/.*\.rst|src/saltext/proxmox/.*\.py)$
         additional_dependencies:
-          - black==25.1.0
+          - black==26.1.0
   # <---- Formatting -----------------------------------------------------------------------------
 
   # ----- Security ------------------------------------------------------------------------------>
   - repo: https://github.com/PyCQA/bandit
-    rev: 2d0b675b04c80ae42277e10500db06a0a37bae17  # 1.8.6
+    rev: 765f00d3f202f83f61d03f882f80a2d5142d81f8  # 1.9.3
     hooks:
       - id: bandit
         alias: bandit-salt
@@ -102,7 +102,7 @@ repos:
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 2d0b675b04c80ae42277e10500db06a0a37bae17  # 1.8.6
+    rev: 765f00d3f202f83f61d03f882f80a2d5142d81f8  # 1.9.3
     hooks:
       - id: bandit
         alias: bandit-tests
@@ -123,8 +123,8 @@ repos:
         files: ^((setup|noxfile)|src/.*)\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2025.5.1
-          - uv==0.8.18  # Makes this hook much faster
+          - nox==2025.11.12
+          - uv==0.9.27  # Makes this hook much faster
 
       - id: nox
         alias: lint-tests
@@ -134,11 +134,11 @@ repos:
         files: ^tests/.*\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2025.5.1
-          - uv==0.8.18  # Makes this hook much faster
+          - nox==2025.11.12
+          - uv==0.9.27  # Makes this hook much faster
 
   - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
-    rev: f999ae59ac949d9b57aaa5569c2d60eb846b3a00  # v1.7.7.24
+    rev: 85c37735ea69e5baf0681530e57e63deee0ce733  # v1.7.10.24
     hooks:
       - id: actionlint
         additional_dependencies:

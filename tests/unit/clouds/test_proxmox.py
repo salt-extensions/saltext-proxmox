@@ -493,16 +493,14 @@ def test_detailed_logging_on_http_errors(
     response = requests.Response()
     response.status_code = 400
     response.reason = "Parameter verification failed."
-    response.raw = io.BytesIO(
-        b"""
+    response.raw = io.BytesIO(b"""
         {
             "data": null,
             "errors": {
                 "type": "value 'invalid_value' does not have a value in the enumeration 'vm, storage, node, sdn'"
             }
         }
-        """
-    )
+        """)
 
     mock_request.return_value = response
     mock_get_api_token.return_value = "api_token_value"
