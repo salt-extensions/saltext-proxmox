@@ -3,6 +3,11 @@ name: Prepare Release PR
 
 on:
   workflow_call:
+    secrets:
+      AUTORELEASE_CLID:
+        required: false
+      AUTORELEASE_PRIV:
+        required: false
   workflow_dispatch:
     inputs:
       version:
@@ -16,11 +21,30 @@ jobs:
     name: Render changelog and create/update PR
     runs-on: ubuntu-24.04
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    permissions:
-      contents: write
-      pull-requests: write
 
     steps:
+      # We support running with and without a dedicated app.
+      # Registering a dedicated app allows CI to run on the release PR.
+      - name: Check if autorelease app was setup
+        id: check-app
+        env:
+          AUTORELEASE_CLID: ${{ secrets.AUTORELEASE_CLID }}
+          AUTORELEASE_PRIV: ${{ secrets.AUTORELEASE_PRIV }}
+        run: |-
+          if [ -n "$AUTORELEASE_CLID" ] && [ -n "$AUTORELEASE_PRIV" ]; then
+            echo "available=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate autorelease token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3.0.0
+        if: steps.check-app.outputs.available == '1'
+        id: generate-token
+        with:
+          app-id: ${{ secrets.AUTORELEASE_CLID }}
+          private-key: ${{ secrets.AUTORELEASE_PRIV }}
+
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
@@ -35,7 +59,7 @@ jobs:
           python -m pip install '.[changelog]' pre-commit
 
       - name: Get next version
-        if: github.event_name == 'push' || inputs.version == ''
+        if: github.event_name != 'workflow_dispatch' || inputs.version == ''
         id: next-version
         run: echo "version=$(python tools/version.py next)" >> "$GITHUB_OUTPUT"
 
@@ -51,11 +75,13 @@ jobs:
       - name: Create/update release PR
         uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0  # v8.1.0
         with:
+          token: ${{ steps.check-app.outputs.available == '1' && steps.generate-token.outputs.token || github.token }}
           commit-message: Release v${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && inputs.version || steps.next-version.outputs.version }}
           branch: release/auto
           sign-commits: true
+          labels: release
           title: Release v${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && inputs.version || steps.next-version.outputs.version }}
-          body: |
+          body: |-
             This automated PR builds the latest changelog. When merged, a new release is published automatically.
 
             Before merging, please ensure it's based on the most recent default branch HEAD.
@@ -63,3 +89,7 @@ jobs:
             If you want to rebuild this PR with a custom version or the current date, you can also trigger the corresponding workflow manually in `Actions` > `Prepare Release PR` > `Run workflow`.
 
             You can still follow the manual release procedure outlined in: https://salt-extensions.github.io/salt-extension-copier/topics/publishing.html
+
+      - name: Upload Exit Status
+        if: always()
+        uses: ./.github/actions/upload-exitstatus

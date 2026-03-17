@@ -1,0 +1,107 @@
+# Creates a new release and tag.
+# Triggered when the PR created by prepare-release-action.yml is merged.
+# The resulting version is taken from the topmost CHANGELOG.md entry.
+# Fails if any news fragments are left over or the inferred version does not match the PR title.
+#
+# Alternative to releasing by manual tag push handled in tag.yml.
+---
+name: Auto PR Releases
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+    paths:
+      - CHANGELOG.md
+
+jobs:
+  ensure_trigger:
+    # We need this workflow to fail if it was triggered accidentally.
+    name: Ensure trigger is valid
+    runs-on: ubuntu-24.04
+    permissions: {}
+
+    steps:
+      - name: Validate trigger
+        env:
+          # Only trigger this on closed pull requests if:
+          #   - The PR was merged, not just closed.
+          #   - The originating branch is from the same repository as the one running this workflow.
+          #   - The originating branch is called `release/auto`
+          #   - The PR targeted the default branch of the repository this workflow is running from.
+          #   - The PR was labeled with `release`.
+          IS_VALID: >-
+            ${{
+              github.event.pull_request.merged == true &&
+              github.repository == github.event.pull_request.head.repo.full_name &&
+              github.head_ref == 'release/auto' &&
+              github.base_ref == github.event.repository.default_branch &&
+              contains(github.event.pull_request.labels.*.name, 'release')
+            }}
+        run: test "$IS_VALID" = "true"
+
+  get_version_pr:
+    name: Extract version from merged release PR
+    runs-on: ubuntu-24.04
+    needs:
+      - ensure_trigger
+    permissions:
+      contents: write  # To push the new tag. This does not cause a tag event.
+
+    outputs:
+      version: ${{ steps.get_version_pr.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-tags: true
+
+      - name: Extract version of merged release PR
+        id: get_version_pr
+        run: echo "version=$(python tools/version.py)" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure no news fragments are left
+        run: test -z "$(find changelog -type f -not -path '*/.*' -print -quit)"
+
+      - name: Check extracted version matches PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          VERSION: ${{ steps.get_version_pr.outputs.version }}
+        run: test "$TITLE" = "Release v$VERSION"
+
+      - name: Ensure tag does not exist yet
+        env:
+          VERSION: ${{ steps.get_version_pr.outputs.version }}
+        run: if git rev-parse "refs/tags/v$VERSION" 2>/dev/null; then exit 1; fi
+
+      - name: Create tag for release
+        uses: mathieudutour/github-tag-action@d28fa2ccfbd16e871a4bdf35e11b3ad1bd56c0c1  # v6.2
+        with:
+          github_token: ${{ github.token }}
+          custom_tag: ${{ steps.get_version_pr.outputs.version }}
+          create_annotated_tag: true
+
+      - name: Write version file
+        env:
+          VERSION: ${{ steps.get_version_pr.outputs.version }}
+        run: echo -n "$VERSION" > "$RUNNER_TEMP/version.txt"
+
+      - name: Upload version
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
+        with:
+          archive: false
+          path: ${{ runner.temp }}/version.txt
+
+  call_central_workflow:
+    needs:
+      - get_version_pr
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: read
+
+  # Further jobs are run separately on `workflow_run` in deploy-package-action.yml

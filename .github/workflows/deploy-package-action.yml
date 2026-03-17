@@ -1,60 +1,148 @@
 ---
-name: Deploy Salt Extension Python Package
+name: Release Salt Extension Python Package
 
 on:
-  workflow_call:
-    inputs:
-      test:
-        type: boolean
-        required: false
-        default: true
-      version:
-        type: string
-        required: true
-    secrets:
-      PYPI_API_TOKEN:
-        required: false
-      TEST_PYPI_API_TOKEN:
-        required: false
+  workflow_run:
+    types:
+      - completed
+    workflows:
+      - Auto PR Releases
+      - Tagged Releases
 
 jobs:
-  build:
-    name: Publish Python Package to ${{ ! inputs.test && 'PyPI' || 'Test PyPI' }}
+  get_version:
+    name: Get package version
     runs-on: ubuntu-24.04
+    if: github.event.workflow_run.conclusion == 'success'
+    permissions:
+      actions: read
+    outputs:
+      version: ${{ steps.extract-version.outputs.version }}
+
+    steps:
+      - name: Download expected version
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          name: version.txt
+          path: ${{ runner.temp }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Download Python Package Artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          name: salt-extension-packages
+          path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Extract and verify package version
+        id: extract-version
+        run: |-
+          wheel_file="$(find dist -name '*.whl' | head -n 1)"
+          test -n "$wheel_file" || exit 1
+          unzip "$wheel_file" -d "$RUNNER_TEMP/extract"
+          dist_info="$(find "$RUNNER_TEMP/extract" -type d -name '*.dist-info' | head -n 1)"
+          test -n "$dist_info" || exit 1
+          package_version="$(sed -n 's/^Version:\s*\(\S*\)$/\1/p' "$dist_info/METADATA")"
+          test -n "$package_version" || exit 1
+          expected_version="$(cat "$RUNNER_TEMP/version.txt" | head -n 1)"
+          echo "Detected package version: $package_version"
+          echo "Expected version: $expected_version"
+          test "$package_version" = "$expected_version" || exit 1
+          echo "version=$expected_version" >> "$GITHUB_OUTPUT"
+
+  test_release:
+    name: Publish Python Package to Test PyPI
+    runs-on: ubuntu-24.04
+    needs:
+      - get_version
+    permissions:
+      actions: read
+      id-token: write
 
     steps:
       - name: Download Python Package Artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
         with:
-          name: salt-extension-${{ inputs.version }}-packages
+          name: salt-extension-packages
           path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Publish distribution to Test PyPI
-        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f # v1.11.0
-        if: ${{ inputs.test }}
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
         with:
-          attestations: false
+          attestations: ${{ secrets.TEST_PYPI_API_TOKEN == '' }}
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
+          verbose: ${{ runner.debug == '1' }}
 
-      - name: Create GitHub Release
-        if: ${{ !inputs.test }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "v${{ inputs.version }}" \
-              --repo="$GITHUB_REPOSITORY" \
-              --title="${GITHUB_REPOSITORY#*/} ${{ inputs.version }}" \
-              --generate-notes \
-              dist/*
+  pypi_release:
+    name: Publish Python Package to PyPI
+    runs-on: ubuntu-24.04
+    needs:
+      - test_release
+    permissions:
+      actions: read
+      id-token: write
+    environment:
+      name: release
+      url: https://pypi.org/p/saltext.proxmox
+
+    steps:
+      - name: Download Python Package Artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          name: salt-extension-packages
+          path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@1bb664cc2ddedbbfdde43d4ac135d5836b7bf40f # v1.11.0
-        if: ${{ !inputs.test }}
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
         with:
-          # Attestations are only submitted when using Trusted Publishing,
-          # which is triggered by secrets.PYPI_API_TOKEN not being set.
-          # They don't work with reusable workflows at the moment.
-          # It's related to https://github.com/pypi/warehouse/issues/11096
-          attestations: false
+          attestations: ${{ secrets.PYPI_API_TOKEN == '' }}
           password: ${{ secrets.PYPI_API_TOKEN }}
+          verbose: ${{ runner.debug == '1' }}
+
+  docs_release:
+    name: Deploy Docs
+    uses: ./.github/workflows/deploy-docs-action.yml
+    needs:
+      - pypi_release
+      - get_version
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+
+  gh_release:
+    name: Create GitHub release
+    runs-on: ubuntu-24.04
+    needs:
+      - pypi_release
+      - get_version
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download Python Package Artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          name: salt-extension-packages
+          path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.get_version.outputs.version }}
+        run: |
+          gh release create "v${{ needs.get_version.outputs.version }}" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${GITHUB_REPOSITORY#*/} $VERSION" \
+              --generate-notes \
+              dist/*

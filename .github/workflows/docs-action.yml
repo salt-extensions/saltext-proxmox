@@ -4,6 +4,9 @@ name: Build Documentation
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   Docs:
     runs-on: ubuntu-24.04
@@ -24,8 +27,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install "nox==$NOX_VERSION" "uv==$UV_VERSION"
         env:
-          NOX_VERSION: '2025.11.12'
-          UV_VERSION: '0.9.27'
+          NOX_VERSION: '2026.2.9'
+          UV_VERSION: '0.10.11'
 
       - name: Install Doc Requirements
         run: |
@@ -38,21 +41,11 @@ jobs:
           nox --force-color -e docs
 
       - name: Upload built docs as artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: html-docs
           path: docs/_build/html
 
-      - name: Set Exit Status
-        if: always()
-        run: |
-          mkdir exitstatus
-          echo "${{ job.status }}" > exitstatus/${{ github.job }}
-
       - name: Upload Exit Status
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
-        with:
-          name: exitstatus-${{ github.job }}
-          path: exitstatus
-          if-no-files-found: error
+        uses: ./.github/actions/upload-exitstatus
