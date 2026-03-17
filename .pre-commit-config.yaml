@@ -66,7 +66,7 @@ repos:
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/PyCQA/isort
-    rev: 0a09c783808cfe77bb3269250f663ff733d23302  # 7.0.0
+    rev: a333737ed43df02b18e6c95477ea1b285b3de15a  # 8.0.1
     hooks:
       - id: isort
         args: [
@@ -75,7 +75,7 @@ repos:
         exclude: src/saltext/proxmox/(__init__|version).py
 
   - repo: https://github.com/psf/black
-    rev: 6305bf1ae645ab7541be4f5028a86239316178eb  # 26.1.0
+    rev: c6755bb741b6481d6b3d3bb563c83fa060db96c9  # 26.3.1
     hooks:
       - id: black
         args: [-l 100]
@@ -88,12 +88,12 @@ repos:
         args: [--skip-errors]
         files: ^(docs/.*\.rst|src/saltext/proxmox/.*\.py)$
         additional_dependencies:
-          - black==26.1.0
+          - black==26.3.1
   # <---- Formatting -----------------------------------------------------------------------------
 
   # ----- Security ------------------------------------------------------------------------------>
   - repo: https://github.com/PyCQA/bandit
-    rev: 765f00d3f202f83f61d03f882f80a2d5142d81f8  # 1.9.3
+    rev: 92ae8b82fb422a639f0ed8d99e96cea769594e08  # 1.9.4
     hooks:
       - id: bandit
         alias: bandit-salt
@@ -102,7 +102,7 @@ repos:
         exclude: src/saltext/proxmox/version.py
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 765f00d3f202f83f61d03f882f80a2d5142d81f8  # 1.9.3
+    rev: 92ae8b82fb422a639f0ed8d99e96cea769594e08  # 1.9.4
     hooks:
       - id: bandit
         alias: bandit-tests
@@ -123,8 +123,8 @@ repos:
         files: ^((setup|noxfile)|src/.*)\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2025.11.12
-          - uv==0.9.27  # Makes this hook much faster
+          - nox==2026.2.9
+          - uv==0.10.11  # Makes this hook much faster
 
       - id: nox
         alias: lint-tests
@@ -134,11 +134,11 @@ repos:
         files: ^tests/.*\.py$
         require_serial: true
         additional_dependencies:
-          - nox==2025.11.12
-          - uv==0.9.27  # Makes this hook much faster
+          - nox==2026.2.9
+          - uv==0.10.11  # Makes this hook much faster
 
   - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
-    rev: 85c37735ea69e5baf0681530e57e63deee0ce733  # v1.7.10.24
+    rev: 694e2c0dfb4253d51f3c6c54b8f9fec0a16764dc  # v1.7.11.24
     hooks:
       - id: actionlint
         additional_dependencies:

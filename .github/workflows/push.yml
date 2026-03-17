@@ -1,0 +1,100 @@
+---
+name: Push
+
+on:
+  push:
+    branches:
+      - 'main'  # Run on pushes to main
+    tags-ignore:
+      - '*'   # Ignore pushes to tags
+
+jobs:
+  # After merging the release PR, we don't want to trigger
+  # this workflow in addition to the Tagged Releases one.
+  # This pauses CI on pushes to the main branch completely.
+  check_release_in_progress:
+    name: Skip CI While Releasing
+    runs-on: ubuntu-24.04
+    outputs:
+      count: ${{ steps.workflow_count.outputs.count }}
+
+    steps:
+      - name: Count Running Release Workflows Triggered by Automated PR
+        id: workflow_count
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --event pull_request \
+            --branch release/auto \
+            --workflow 'Auto PR Releases' \
+            --json status \
+            --jq 'map(select(.status == ("queued","in_progress"))) | length')"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+  call_central_workflow:
+    name: CI
+    needs:
+      - check_release_in_progress
+    if: needs.check_release_in_progress.outputs.count == '0'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: read
+
+  deploy-docs:
+    name: Deploy Docs
+    needs:
+      - call_central_workflow
+    # Only build doc deployments from the default branch of the repo
+    if: success() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    uses: ./.github/workflows/deploy-docs-action.yml
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+
+  check-prepare-release:
+    name: Check if we can prepare release PR
+    needs:
+      - call_central_workflow
+    if: success() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    outputs:
+      news-fragments-available: ${{ steps.check-available.outputs.available }}
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Check if news fragments are available
+        id: check-available
+        run: |
+          if [ -n "$(find changelog -type f -not -name '.*' -print -quit)" ]; then
+            echo "available=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=0" >> "$GITHUB_OUTPUT"
+          fi
+
+  prepare-release:
+    name: Prepare Release PR
+    needs:
+      - check-prepare-release
+    if: success() && needs.check-prepare-release.outputs.news-fragments-available == '1'
+    uses: ./.github/workflows/prepare-release-action.yml
+    secrets:
+      AUTORELEASE_CLID: ${{ secrets.AUTORELEASE_CLID }}
+      AUTORELEASE_PRIV: ${{ secrets.AUTORELEASE_PRIV }}
+
+  set_resolution:
+    # This step is just so we can make github require this step, to pass checks
+    # on a pull request instead of requiring all
+    name: Set the CI Pipeline Exit Status
+    needs:
+      - check_release_in_progress
+      - call_central_workflow
+      - deploy-docs
+      - prepare-release
+    if: always() && needs.check_release_in_progress.outputs.count == '0'
+    uses: ./.github/workflows/set-resolution-action.yml

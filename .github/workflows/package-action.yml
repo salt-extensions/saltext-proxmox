@@ -1,12 +1,11 @@
 ---
-name: Salt Extension Python Package
+name: Build Salt Extension Python Package
 
 on:
   workflow_call:
-    inputs:
-      version:
-        required: true
-        type: string
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -30,35 +29,16 @@ jobs:
           build
           --user
 
-      - name: Echo Version
-        run: echo "${{ inputs.version }}"
-
       - name: Build Wheel
-        run: |
-          # The version of our PyPA publish action (specifically the twine version used in it)
-          # does not support Core Metadata 2.4, which was introduced in setuptools release 77.
-          # We cannot upgrade it until the release workflow has been refactored into standalone one.
-          echo "setuptools<77" > "$RUNNER_TEMP/build-constraints.txt"
-          PIP_CONSTRAINT="$RUNNER_TEMP/build-constraints.txt" python -m build --outdir dist/
+        run: python -m build --outdir dist/
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
-        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
-          name: salt-extension-${{ inputs.version }}-packages
+          name: salt-extension-packages
           path: dist/*
           retention-days: 5
 
-      - name: Set Exit Status
-        if: always()
-        run: |
-          mkdir exitstatus
-          echo "${{ job.status }}" > exitstatus/${{ github.job }}
-
       - name: Upload Exit Status
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
-        with:
-          name: exitstatus-${{ github.job }}
-          path: exitstatus
-          if-no-files-found: error
+        uses: ./.github/actions/upload-exitstatus

@@ -1,3 +1,9 @@
+# Creates a new release.
+# Triggered by pushing a tag beginning with `v`.
+# The resulting version is taken from the tag.
+# Fails if any news fragments are left over or the inferred version does not match the topmost changelog entry.
+#
+# Alternative to releasing by merging the autorelease PR.
 ---
 name: Tagged Releases
 
@@ -5,17 +11,11 @@ on:
   push:
     tags:
       - "v*"  # Only tags starting with "v" for "v1.0.0", etc.
-  pull_request:
-    types:
-      - closed
-    paths:
-      - CHANGELOG.md
 
 jobs:
   get_version_tag:
     name: Extract version from tag
     runs-on: ubuntu-24.04
-    if: github.event_name == 'push'
     outputs:
       version: ${{ steps.get_version_tag.outputs.version }}
 
@@ -23,25 +23,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Extract tag name
+      - name: Extract version from tag name
         id: get_version_tag
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Ensure changelog was rendered
+        env:
+          VERSION: ${{ steps.get_version_tag.outputs.version }}
         run: |
-          test "${{ steps.get_version_tag.outputs.version }}" = "$(python tools/version.py)" && \
+          test "$VERSION" = "$(python tools/version.py)" && \
           test -z "$(find changelog -type f -not -name '.*' -print -quit)"
+
+      - name: Write version file
+        env:
+          VERSION: ${{ steps.get_version_tag.outputs.version }}
+        run: echo -n "$VERSION" > "$RUNNER_TEMP/version.txt"
+
+      - name: Upload version
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
+        with:
+          archive: false
+          path: ${{ runner.temp }}/version.txt
 
   close_autopr_on_tag:
     name: Close release PR on manual tag
     runs-on: ubuntu-24.04
-    if: github.event_name == 'push'
     needs:
       - get_version_tag
 
     steps:
       - name: Find Pull Request
-        uses: juliangruber/find-pull-request-action@20b962e58a4abbc0dc63bcc0fde0c997de8782b5  # v1.10.0
+        uses: juliangruber/find-pull-request-action@2956f830b67a9c78c392f00c69404edc4e497d30  # v1.11.0
         id: find-pull-request
         with:
           branch: release/auto
@@ -59,70 +71,13 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             "${{ steps.find-pull-request.outputs.number }}"
 
-  get_version_pr:
-    name: Extract version from merged release PR
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write  # To push the new tag. This does not cause a tag event.
-
-    # Only trigger this on closed pull requests if:
-    #   - The originating branch is from the same repository as the one running this workflow.
-    #   - The originating branch is called `release/auto`
-    #   - The PR was merged, not just closed.
-    #   - The PR targeted the default branch of the repository this workflow is running from.
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.repository == github.event.pull_request.head.repo.full_name &&
-      github.head_ref == 'release/auto' &&
-      github.event.pull_request.merged == true &&
-      github.base_ref == github.event.repository.default_branch
-
-    outputs:
-      version: ${{ steps.get_version_pr.outputs.version }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-
-      - name: Extract version of merged release PR
-        id: get_version_pr
-        run: echo "version=$(python tools/version.py)" >> "$GITHUB_OUTPUT"
-
-      - name: Ensure no news fragments are left
-        run: test -z "$(find changelog -type f -not -path '*/.*' -print -quit)"
-
-      - name: Check extracted version matches PR title
-        env:
-          TITLE: ${{ github.event.pull_request.title }}
-        run: >-
-          [[ "$TITLE" == "Release v${{ steps.get_version_pr.outputs.version }}" ]] || exit 1
-
-      - name: Create tag for release
-        uses: mathieudutour/github-tag-action@d28fa2ccfbd16e871a4bdf35e11b3ad1bd56c0c1  # v6.2
-        with:
-          github_token: ${{ github.token }}
-          custom_tag: ${{ steps.get_version_pr.outputs.version }}
-          create_annotated_tag: true
-
   call_central_workflow:
-    # Only call the central workflow if either of the above jobs report success.
-    if: >-
-      always() &&
-      (
-        needs.get_version_tag.result == 'success' ||
-        needs.get_version_pr.result == 'success'
-      )
     needs:
       - get_version_tag
-      - get_version_pr
     uses: ./.github/workflows/ci.yml
-    with:
-      deploy-docs: true
-      release: true
-      version: ${{ github.event_name == 'push' && needs.get_version_tag.outputs.version || needs.get_version_pr.outputs.version }}
     permissions:
-      contents: write
+      contents: read
       id-token: write
-      pages: write
-      pull-requests: write
-    secrets: inherit
+      pull-requests: read
+
+  # Further jobs are run separately on `workflow_run` in deploy-package-action.yml

@@ -1,0 +1,41 @@
+---
+name: Set the CI Pipeline Exit Status
+
+on:
+  workflow_call:
+
+jobs:
+  set-pipeline-exit-status:
+    # This step is just so we can make github require this step, to pass checks
+    # on a pull request instead of requiring all
+    name: Set the CI Pipeline Exit Status
+    runs-on: ubuntu-24.04
+    if: always()
+
+    steps:
+      - name: Download Exit Status Files
+        if: always()
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          path: exitstatus
+          pattern: exitstatus-*
+          merge-multiple: true
+
+      - name: Delete Exit Status Artifacts
+        if: always()
+        uses: geekyeggo/delete-artifact@7ee91e82b4a7f3339cd8b14beace3d826a2aac39  # v5.1.0
+        with:
+          name: exitstatus-*
+          useGlob: true
+          failOnError: false
+
+      - name: Set Pipeline Exit Status
+        if: always()
+        run: |
+          tree exitstatus
+          grep -RE 'failure|cancelled' exitstatus/ && exit 1 || exit 0
+
+      - name: Done
+        if: always()
+        run:
+          echo "All workflows finished"

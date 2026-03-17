@@ -6,13 +6,14 @@ on:
         description: "Changed file JSON output from dorny/paths-filter"
         value: ${{ jobs.get-changed-files.outputs.changed-files }}
 
+permissions:
+  contents: read  # for dorny/paths-filter to fetch a list of changed files
+  pull-requests: read  # for dorny/paths-filter to read pull requests
+
 jobs:
   get-changed-files:
     name: Get Changed Files
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read  # for dorny/paths-filter to fetch a list of changed files
-      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       changed-files: ${{ toJSON(steps.changed-files.outputs) }}
 
@@ -25,7 +26,7 @@ jobs:
         with:
           token: ${{ github.token }}
           list-files: escape
-          filters: |
+          filters: |-
             repo:
               - added|modified:
                 - '**'
