@@ -581,7 +581,7 @@ def _get_vm_by_name(name):
     """
     vms = _query("GET", "cluster/resources", {"type": "vm"})
     for vm in vms:
-        if vm["name"] == name:
+        if vm.get("name") == name:
             return vm
 
     raise SaltCloudNotFound(f"The specified VM with name '{name}' could not be found.")
