@@ -96,6 +96,8 @@ def create(vm_):
     if should_clone:
         clone(call="function", kwargs=clone_options)
     else:
+        ## hack for proper VM name :
+        vm_["create"].update(name = vm_["name"])
         _query("POST", f"nodes/{vm_['create']['node']}/{type}", vm_["create"])
 
     start(call="action", name=vm_["name"])
