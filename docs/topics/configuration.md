@@ -10,6 +10,8 @@ my-proxmox-config:
   token: myapitoken
   url: https://hypervisor.domain.tld:8006
   driver: proxmox
+  # Optional
+  ssl_verify: /etc/ssl/cert.pem #Path to pem file
 ```
 
 ## Profile examples
