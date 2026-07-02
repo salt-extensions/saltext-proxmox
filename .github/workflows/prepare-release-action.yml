@@ -38,7 +38,7 @@ jobs:
           fi
 
       - name: Generate autorelease token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859  # v3.0.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
         if: steps.check-app.outputs.available == '1'
         id: generate-token
         with:
@@ -46,12 +46,12 @@ jobs:
           private-key: ${{ secrets.AUTORELEASE_PRIV }}
 
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install project
         run: |
@@ -73,7 +73,7 @@ jobs:
           python -m pre_commit run --files=CHANGELOG.md || true
 
       - name: Create/update release PR
-        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0  # v8.1.0
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
         with:
           token: ${{ steps.check-app.outputs.available == '1' && steps.generate-token.outputs.token || github.token }}
           commit-message: Release v${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && inputs.version || steps.next-version.outputs.version }}

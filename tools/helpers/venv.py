@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from shutil import rmtree
 
 from . import prompt
 from .cmd import CommandNotFound
@@ -8,7 +9,7 @@ from .copier import discover_project_name
 
 # Should follow the version used for relenv packages, see
 # https://github.com/saltstack/salt/blob/master/cicd/shared-gh-workflows-context.yml
-RECOMMENDED_PYVER = "3.10"
+RECOMMENDED_PYVER = "3.14"
 # For discovery of existing virtual environment, descending priority.
 VENV_DIRS = (
     ".venv",
@@ -18,10 +19,11 @@ VENV_DIRS = (
 )
 
 
-try:
-    uv = local["uv"]
-except CommandNotFound:
-    uv = None
+def discover_uv():
+    try:
+        return local["uv"]
+    except CommandNotFound:
+        pass
 
 
 def is_venv(path):
@@ -38,12 +40,20 @@ def discover_venv(project_root="."):
     raise RuntimeError(f"No venv found in {base}")
 
 
+def venv_pyver(venv):
+    for line in (venv / "pyvenv.cfg").read_text().splitlines():
+        if line.startswith("version =") or line.startswith("version_info ="):
+            pyver = line.split(" = ")[1].split(".")
+            return f"{pyver[0]}.{pyver[1]}"
+
+
 def create_venv(project_root=".", directory=None):
     base = Path(project_root).resolve()
     venv = (base / (directory or VENV_DIRS[0])).resolve()
     if is_venv(venv):
         raise RuntimeError(f"Venv at {venv} already exists")
     prompt.status(f"Creating virtual environment at {venv}")
+    uv = discover_uv()
     if uv is not None:
         prompt.status("Found `uv`. Creating venv")
         uv(
@@ -74,6 +84,15 @@ def ensure_project_venv(project_root=".", reinstall=True, install_extras=False):
     try:
         venv = discover_venv(project_root)
         prompt.status(f"Found existing virtual environment at {venv}")
+
+        pyver = venv_pyver(venv)
+        if pyver != RECOMMENDED_PYVER:
+            prompt.status(
+                f"Existing venv has Python {pyver}, but recommended is {RECOMMENDED_PYVER}. Recreating."
+            )
+            rmtree(venv)
+            raise RuntimeError("Existing venv does not use recommended Python version")
+
         exists = True
     except RuntimeError:
         venv = create_venv(project_root)
@@ -84,6 +103,7 @@ def ensure_project_venv(project_root=".", reinstall=True, install_extras=False):
         extras.append("dev_extra")
     prompt.status(("Reinstalling" if exists else "Installing") + " project and dependencies")
     with local.venv(venv):
+        uv = discover_uv()
         if uv is not None:
             uv("pip", "install", "-e", f".[{','.join(extras)}]")
         else:

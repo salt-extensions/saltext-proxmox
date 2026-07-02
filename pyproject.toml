@@ -26,6 +26,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
@@ -58,9 +62,9 @@ dev = [
 # When initializing the dev env using the included automation, pass
 # `--extras` to install them automatically.
 dev_extra = [
-    "black==26.3.1",
+    "black==26.5.1",
     "isort==8.0.1",
-    "coverage==7.13.4",
+    "coverage==7.14.3",
 ]
 docs = [
   "sphinx",

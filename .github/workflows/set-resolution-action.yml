@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Download Exit Status Files
         if: always()
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: exitstatus
           pattern: exitstatus-*
@@ -23,7 +23,7 @@ jobs:
 
       - name: Delete Exit Status Artifacts
         if: always()
-        uses: geekyeggo/delete-artifact@7ee91e82b4a7f3339cd8b14beace3d826a2aac39  # v5.1.0
+        uses: geekyeggo/delete-artifact@176a747ab7e287e3ff4787bf8a148716375ca118  # v6.0.0
         with:
           name: exitstatus-*
           useGlob: true

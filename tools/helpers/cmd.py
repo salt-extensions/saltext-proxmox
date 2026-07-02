@@ -8,12 +8,10 @@ import platform
 import shlex
 import shutil
 import subprocess
-import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
-from typing import Union
 
 
 class CommandNotFound(RuntimeError):
@@ -123,6 +121,15 @@ class Local:
         List of paths in the context's $PATH.
         """
         return self._env.get("PATH", "").split(os.pathsep)
+
+    def which(self, cmd):
+        """
+        Find `cmd` in $PATH.
+        """
+        res = shutil.which(cmd)
+        if not res:
+            raise CommandNotFound(cmd)
+        return Path(res)
 
     @contextmanager
     def cwd(self, path):
