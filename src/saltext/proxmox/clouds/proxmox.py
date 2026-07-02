@@ -508,6 +508,7 @@ def _query(method, path, data=None):
     """
     base_url = _get_url()
     api_token = _get_api_token()
+    ssl_verify = _get_ssl_verify()
 
     url = f"{base_url}/api2/json/{path}"
 
@@ -526,6 +527,7 @@ def _query(method, path, data=None):
                 headers=headers,
                 params=data,
                 timeout=10,
+                verify=ssl_verify,
             )
         else:
             headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -535,6 +537,7 @@ def _query(method, path, data=None):
                 headers=headers,
                 data=data,
                 timeout=10,
+                verify=ssl_verify,
             )
 
         response.raise_for_status()
@@ -554,6 +557,13 @@ def _get_url():
         "url", get_configured_provider(), __opts__, search_global=False
     )
 
+def _get_ssl_verify():
+    """
+    Returns the configured ssl_verify setting
+    """
+    return config.get_cloud_config_value(
+        "ssl_verify", get_configured_provider(), __opts__, search_global=False
+    )
 
 def _get_api_token():
     """
