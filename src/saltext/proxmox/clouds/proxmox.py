@@ -357,7 +357,9 @@ def list_nodes_full(call=None):
 
     ret = {}
     for vm in vms:
-        name = vm["name"]
+        name = vm.get("name")
+        if name is None:
+            continue
         config = _query("GET", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}/config")
 
         ret[name] = vm
@@ -581,7 +583,7 @@ def _get_vm_by_name(name):
     """
     vms = _query("GET", "cluster/resources", {"type": "vm"})
     for vm in vms:
-        if vm["name"] == name:
+        if vm.get("name") == name:
             return vm
 
     raise SaltCloudNotFound(f"The specified VM with name '{name}' could not be found.")
