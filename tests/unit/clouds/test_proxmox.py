@@ -56,12 +56,56 @@ def test_create(mock__query: MagicMock, mock_start: MagicMock, mock_show_instanc
     }
 
     with (
+        patch(_fqn(proxmox._wait_for_task), autospec=True),
         patch("salt.utils.cloud.bootstrap", MagicMock()),
         patch("salt.utils.cloud.filter_event", MagicMock()),
         patch("salt.utils.cloud.fire_event", MagicMock()),
     ):
         proxmox.create(create_config)
     mock__query.assert_called_with("POST", "nodes/proxmox-node1/qemu", create_config["create"])
+
+
+def test_create_waits_for_creation_task_before_starting():
+    """
+    Test that `create()` waits for the asynchronous creation task to finish
+    before it tries to start the new guest
+    """
+    create_config = {
+        "name": "my-vm",
+        "technology": "qemu",
+        "create": {
+            "vmid": 123,
+            "node": "proxmox-node1",
+        },
+    }
+    upid = "UPID:proxmox-node1:00000001:00000001:qmcreate:123:root@pam:"
+
+    # The creation POST is asynchronous: it returns a task UPID rather than the
+    # finished guest. Report that task as already stopped when it is polled.
+    order = []
+
+    def fake_query(method, path, data=None):  # pylint: disable=unused-argument
+        order.append(path)
+        return upid if method == "POST" else {"status": "stopped"}
+
+    def fake_start(*args, **kwargs):  # pylint: disable=unused-argument
+        order.append("start")
+
+    with (
+        patch(_fqn(proxmox._query), autospec=True, side_effect=fake_query),
+        patch(_fqn(proxmox.start), autospec=True, side_effect=fake_start),
+        patch(_fqn(proxmox.show_instance), autospec=True),
+        patch("salt.utils.cloud.bootstrap", MagicMock()),
+        patch("salt.utils.cloud.filter_event", MagicMock()),
+        patch("salt.utils.cloud.fire_event", MagicMock()),
+    ):
+        proxmox.create(create_config)
+
+    assert order == [
+        "nodes/proxmox-node1/qemu",
+        f"nodes/proxmox-node1/tasks/{upid}/status",
+        "start",
+    ]
 
 
 @patch(_fqn(proxmox.show_instance))

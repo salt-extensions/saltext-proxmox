@@ -54,6 +54,46 @@ def _get_active_provider_name():
         return __active_provider_name__
 
 
+def _wait_for_task(node, upid, timeout=120, interval=1):
+    """
+    Poll a Proxmox task until it reports completion, or timeout elapses.
+
+    Proxmox's create/clone endpoints are asynchronous -- they return a
+    UPID immediately while the real work continues in the background.
+    Without waiting for the task to actually finish, callers can query
+    for the new guest before it's registered in cluster/resources.
+    """
+    if not upid:
+        return
+
+    waited = 0
+    while waited < timeout:
+        status = _query("GET", f"nodes/{node}/tasks/{upid}/status")
+        if status and status.get("status") == "stopped":
+            return
+        time.sleep(interval)
+        waited += interval
+
+    log.warning("Timed out waiting for Proxmox task %s to complete", upid)
+
+
+def _retry_until_found(func, *args, attempts=15, interval=2, **kwargs):
+    """
+    cluster/resources is a periodically-refreshed cache (pvestatd), not
+    updated synchronously with task completion. A guest can be fully
+    created and its creation task reported 'stopped', while the
+    cluster-wide resource index still hasn't caught up yet. Retry
+    lookups that depend on that index for a few seconds before giving up.
+    """
+    for attempt in range(attempts):
+        try:
+            return func(*args, **kwargs)
+        except SaltCloudNotFound:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(interval)
+
+
 def get_configured_provider():
     """
     Return the first configured instance.
@@ -96,9 +136,10 @@ def create(vm_):
     if should_clone:
         clone(call="function", kwargs=clone_options)
     else:
-        _query("POST", f"nodes/{vm_['create']['node']}/{type}", vm_["create"])
+        task = _query("POST", f"nodes/{vm_['create']['node']}/{type}", vm_["create"])
+        _wait_for_task(vm_["create"]["node"], task)
 
-    start(call="action", name=vm_["name"])
+    _retry_until_found(start, call="action", name=vm_["name"])
 
     # cloud.bootstrap expects the ssh_password to be set in vm_["password"]
     vm_["password"] = vm_.get("ssh_password")
@@ -357,7 +398,9 @@ def list_nodes_full(call=None):
 
     ret = {}
     for vm in vms:
-        name = vm["name"]
+        name = vm.get("name")
+        if name is None:
+            continue
         config = _query("GET", f"nodes/{vm['node']}/{vm['type']}/{vm['vmid']}/config")
 
         ret[name] = vm
@@ -581,7 +624,7 @@ def _get_vm_by_name(name):
     """
     vms = _query("GET", "cluster/resources", {"type": "vm"})
     for vm in vms:
-        if vm["name"] == name:
+        if vm.get("name") == name:
             return vm
 
     raise SaltCloudNotFound(f"The specified VM with name '{name}' could not be found.")
