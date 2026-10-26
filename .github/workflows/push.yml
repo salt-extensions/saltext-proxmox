@@ -1,48 +1,70 @@
 ---
 name: Push
 
+permissions: {}
+
 on:
   push:
     branches:
       - 'main'  # Run on pushes to main
     tags-ignore:
+      # Technically redundant (the `branches` filter alone excludes tag
+      # pushes), but kept as explicit documentation.
       - '*'   # Ignore pushes to tags
 
+concurrency:
+  # Avoid parallel runs for consecutive pushes to main. In-progress runs
+  # are not cancelled since they may deploy docs or prepare a release PR,
+  # but a queued run superseded by a newer push is.
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
-  # After merging the release PR, we don't want to trigger
-  # this workflow in addition to the Tagged Releases one.
-  # This pauses CI on pushes to the main branch completely.
-  check_release_in_progress:
-    name: Skip CI While Releasing
-    runs-on: ubuntu-24.04
+  # The merge commit of the autorelease PR arrives as an ordinary push to
+  # the default branch, indistinguishable from other pushes by ref filters
+  # alone. Skip CI for it: its tree already passed the PR's required checks,
+  # a run here could not gate the tag-driven release pipeline anyway, and
+  # the release deploys the docs itself.
+  check_release_merge:
+    name: Check for Automatic Release Merge
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      pull-requests: read  # Check if push resulted from merging the autorelease PR
     outputs:
-      count: ${{ steps.workflow_count.outputs.count }}
+      is-release: ${{ steps.check.outputs.is-release }}
 
     steps:
-      - name: Count Running Release Workflows Triggered by Automated PR
-        id: workflow_count
+      - name: Check whether push merged an automatic release PR
+        id: check
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          count="$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --event pull_request \
-            --branch release/auto \
-            --workflow 'Auto PR Releases' \
-            --json status \
-            --jq 'map(select(.status == ("queued","in_progress"))) | length')"
-          echo "count=$count" >> "$GITHUB_OUTPUT"
+          is_release="$(gh api \
+            "repos/$GITHUB_REPOSITORY/commits/$COMMIT_SHA/pulls" \
+            --jq '
+              any(.[];
+                .merged_at != null and
+                .merge_commit_sha == env.COMMIT_SHA and
+                .head.ref == "release/auto" and
+                .head.repo.full_name == env.GITHUB_REPOSITORY and
+                .base.ref == env.DEFAULT_BRANCH and
+                any(.labels[]; .name == "release")
+              )
+            ')"
+          echo "is-release=$is_release" >> "$GITHUB_OUTPUT"
 
   call_central_workflow:
     name: CI
     needs:
-      - check_release_in_progress
-    if: needs.check_release_in_progress.outputs.count == '0'
-    uses: ./.github/workflows/ci.yml
+      - check_release_merge
+    if: needs.check_release_merge.outputs.is-release == 'false'
+    uses: $/.github/workflows/ci.yml
     permissions:
       contents: read
-      id-token: write
-      pull-requests: read
+      id-token: write      # codecov upload
+      pull-requests: read  # get changed files
 
   deploy-docs:
     name: Deploy Docs
@@ -50,23 +72,27 @@ jobs:
       - call_central_workflow
     # Only build doc deployments from the default branch of the repo
     if: success() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    uses: ./.github/workflows/deploy-docs-action.yml
+    uses: $/.github/workflows/deploy-docs-action.yml
     permissions:
-      actions: read
-      pages: write
-      id-token: write
+      actions: read    # Download artifacts of other runs when called via workflow_run trigger
+      id-token: write  # Pages deployment
+      pages: write     # Pages deployment
 
   check-prepare-release:
     name: Check if we can prepare release PR
     needs:
       - call_central_workflow
     if: success() && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     outputs:
       news-fragments-available: ${{ steps.check-available.outputs.available }}
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Check if news fragments are available
         id: check-available
@@ -82,19 +108,20 @@ jobs:
     needs:
       - check-prepare-release
     if: success() && needs.check-prepare-release.outputs.news-fragments-available == '1'
-    uses: ./.github/workflows/prepare-release-action.yml
-    secrets:
-      AUTORELEASE_CLID: ${{ secrets.AUTORELEASE_CLID }}
-      AUTORELEASE_PRIV: ${{ secrets.AUTORELEASE_PRIV }}
+    permissions:
+      contents: write       # Create/update autorelease branch
+      pull-requests: write  # Create autorelease PR
+    uses: $/.github/workflows/prepare-release-action.yml
 
   set_resolution:
     # This step is just so we can make github require this step, to pass checks
     # on a pull request instead of requiring all
     name: Set the CI Pipeline Exit Status
     needs:
-      - check_release_in_progress
+      - check_release_merge
       - call_central_workflow
       - deploy-docs
       - prepare-release
-    if: always() && needs.check_release_in_progress.outputs.count == '0'
-    uses: ./.github/workflows/set-resolution-action.yml
+    # Not always() since that would resist cancellation of the whole run
+    if: ${{ !cancelled() && needs.check_release_merge.outputs.is-release == 'false' }}
+    uses: $/.github/workflows/set-resolution-action.yml

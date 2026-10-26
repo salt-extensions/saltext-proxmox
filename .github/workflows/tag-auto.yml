@@ -1,9 +1,11 @@
-# Creates a new release and tag.
+# Creates a new release tag.
 # Triggered when the PR created by prepare-release-action.yml is merged.
 # The resulting version is taken from the topmost CHANGELOG.md entry.
 # Fails if any news fragments are left over or the inferred version does not match the PR title.
 #
-# Alternative to releasing by manual tag push handled in tag.yml.
+# The tag is pushed with the default GITHUB_TOKEN, which does not trigger
+# workflows, so this workflow runs the release pipeline itself as an
+# alternative entry point to tag.yml.
 ---
 name: Auto PR Releases
 
@@ -16,11 +18,21 @@ on:
     paths:
       - CHANGELOG.md
 
+cache-mode: none
+
+concurrency:
+  # Guard against duplicate runs for the same release PR.
+  # Never cancel a release in progress.
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+permissions: {}
+
 jobs:
   ensure_trigger:
-    # We need this workflow to fail if it was triggered accidentally.
+    # We want this workflow to fail if it was triggered accidentally.
+    # This validation is just for the happy path, it's not trusted by the release workflow.
     name: Ensure trigger is valid
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
 
     steps:
@@ -44,24 +56,36 @@ jobs:
 
   get_version_pr:
     name: Extract version from merged release PR
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - ensure_trigger
     permissions:
-      contents: write  # To push the new tag. This does not cause a tag event.
+      contents: write  # Push new tag with default token. Does not cause a tag push event.
 
     outputs:
       version: ${{ steps.get_version_pr.outputs.version }}
 
     steps:
+
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          # We check out the merge commit on the main branch, not unreviewed PR code.
+          # Fork PRs don't have the necessary permissions/secret access to run this job successfully anyways.
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-tags: true
+          persist-credentials: true
 
       - name: Extract version of merged release PR
         id: get_version_pr
-        run: echo "version=$(python tools/version.py)" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          version="$(python tools/version.py)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Invalid version: $version"
+            exit 1
+          }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Ensure no news fragments are left
         run: test -z "$(find changelog -type f -not -path '*/.*' -print -quit)"
@@ -77,31 +101,20 @@ jobs:
           VERSION: ${{ steps.get_version_pr.outputs.version }}
         run: if git rev-parse "refs/tags/v$VERSION" 2>/dev/null; then exit 1; fi
 
-      - name: Create tag for release
-        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b  # v6.2
-        with:
-          github_token: ${{ github.token }}
-          custom_tag: ${{ steps.get_version_pr.outputs.version }}
-          create_annotated_tag: true
-
-      - name: Write version file
+      - name: Create and push tag for release
         env:
           VERSION: ${{ steps.get_version_pr.outputs.version }}
-        run: echo -n "$VERSION" > "$RUNNER_TEMP/version.txt"
+          # Tag the actual commit produced by merging this PR,
+          # rather than relying on the default branch's event SHA.
+          MERGE_COMMIT: ${{ github.event.pull_request.merge_commit_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bot_name="${APP_SLUG:-github-actions}[bot]"
+          bot_id="$(gh api "users/${bot_name}" --jq .id)"
+          git config user.name "$bot_name"
+          git config user.email "${bot_id}+${bot_name}@users.noreply.github.com"
+          git fetch --depth=1 origin "$MERGE_COMMIT"
+          git tag --annotate --message "Release v$VERSION" "v$VERSION" "$MERGE_COMMIT"
+          git push origin "refs/tags/v$VERSION"
 
-      - name: Upload version
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          archive: false
-          path: ${{ runner.temp }}/version.txt
-
-  call_central_workflow:
-    needs:
-      - get_version_pr
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-      id-token: write
-      pull-requests: read
-
-  # Further jobs are run separately on `workflow_run` in deploy-package-action.yml
+  # Further jobs are run separately on `workflow_run` in initiate-release.yml

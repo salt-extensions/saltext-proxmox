@@ -1,7 +1,31 @@
 layout_saltext() {
-    VIRTUAL_ENV="$(python3 tools/initialize.py --print-venv)"
+    # --skip-install only installs the project when the venv is freshly
+    # created or pyproject.toml changed since the last install.
+    # Run `make dev` to force a full synchronization.
+    VIRTUAL_ENV="$(python3 tools/initialize.py --skip-install --print-venv)"
     PATH_add "$VIRTUAL_ENV/bin"
     export VIRTUAL_ENV
 }
+
+# Uncomment to override the Python version for the development venv,
+# e.g. when the configured `venv_python` is hard to come by locally:
+# export VENV_PYTHON=3.13
+
+# Uncomment to inherit system-wide packages in the development venvs,
+# e.g. when dependencies are only available as system packages:
+# export VENV_SYSTEM_SITE_PACKAGES=1
+
+# Uncomment to skip the actionlint hook locally when it cannot be built,
+# e.g. for lack of a Go toolchain. It still runs in CI. Multiple hooks
+# can be specified as a comma-separated list. Other candidates for skipping
+# on specific platforms are:
+#   * ty: Only auto-installed on Windows/Linux/macOS. On other platforms,
+#     requires a locally installed `uv` binary and Rust toolchain since
+#     no binary wheels are available for them.
+#   * zizmor: Only required on Windows/Linux/macOS, other platforms skip it
+#     automatically when not installed via external means.
+#     Requires a Rust toolchain in case no binary wheels are available for
+#     the architecture an otherwise supported OS runs on.
+# export SKIP=actionlint
 
 layout_saltext

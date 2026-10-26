@@ -1,6 +1,13 @@
 ---
+name: Get Changed Files
+
 on:
   workflow_call:
+    inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ''
     outputs:
       changed-files:
         description: "Changed file JSON output from dorny/paths-filter"
@@ -13,19 +20,22 @@ permissions:
 jobs:
   get-changed-files:
     name: Get Changed Files
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       changed-files: ${{ toJSON(steps.changed-files.outputs) }}
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
+          persist-credentials: true  # dorny/paths-filter needs it because the checkout is shallow
 
       - name: Get Changed Files
         id: changed-files
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # v4.0.1
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # v4.0.3
         with:
           token: ${{ github.token }}
-          list-files: escape
+          list-files: json
           filters: |-
             repo:
               - added|modified:
@@ -37,8 +47,8 @@ jobs:
               - added|modified|deleted:
                 - .pre-commit-hooks/**
                 - .pre-commit-config.y?(a)ml
-                - .pylintrc
                 - pyproject.toml
+                - noxfile.py
             # If files in this filter change, a test release to TestPyPI
             # should be attempted. This is currently not implemented yet.
             release:
@@ -47,7 +57,8 @@ jobs:
                 - .github/workflows/**
                 - CHANGELOG.md
                 - pyproject.toml
-                - setup.py
 
       - name: Echo Changed Files Output
-        run: echo "${{ toJSON(steps.changed-files.outputs) }}"
+        run: echo "$CHANGED_FILES"
+        env:
+          CHANGED_FILES: ${{ toJSON(steps.changed-files.outputs) }}

@@ -3,32 +3,54 @@ name: Build Documentation
 
 on:
   workflow_call:
+    inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ''
+      pages-artifact:
+        required: false
+        type: boolean
+        default: false
+      require-in-branch:
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
   Docs:
-    runs-on: ubuntu-24.04
+    name: Build Docs and Upload Artifact
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Set up Python 3.11 For Nox
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+      - name: Enforce ref being in branch
+        if: ${{ inputs.require-in-branch != '' }}
+        env:
+          BRANCH_NAME: ${{ inputs.require-in-branch }}
+          CHECK_REF: ${{ inputs.checkout-ref || github.sha }}
+        run: git merge-base --is-ancestor "$CHECK_REF" "origin/$BRANCH_NAME"
+
+      - name: Set up Python 3.14 For Nox
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.11"
+          python-version: "3.14"
 
       - name: Install Nox
         run: |
-          python -m pip install --upgrade pip
-          pip install "nox==$NOX_VERSION" "uv==$UV_VERSION"
+          pip install "nox==${NOX_VERSION}" "uv==${UV_VERSION}"
         env:
-          NOX_VERSION: '2026.4.10'
-          UV_VERSION: '0.11.26'
+          NOX_VERSION: '2026.10.20'
+          UV_VERSION: '0.13.5'
 
       - name: Install Doc Requirements
         run: |
@@ -36,16 +58,46 @@ jobs:
 
       - name: Build Docs
         env:
-          SKIP_REQUIREMENTS_INSTALL: true
+          SKIP_REQUIREMENTS_INSTALL: '1'
         run: |
           nox --force-color -e docs
 
+      # Create a Pages-compatible artifact if we're going to deploy it
+      - name: Package documentation
+        if: inputs.pages-artifact
+        env:
+          DOCS_DIR: ${{ github.workspace }}/docs/_build/html
+        run: |
+          set -euo pipefail
+
+          test -f "$DOCS_DIR/index.html"
+          mkdir -p "$RUNNER_TEMP/docs"
+          tar \
+            --dereference \
+            --hard-dereference \
+            --directory "$DOCS_DIR" \
+            --exclude=.git \
+            --exclude=.github \
+            --exclude='.[^/]*' \
+            -cf "$RUNNER_TEMP/docs/artifact.tar" \
+            .
+
+      - name: Upload built docs as Pages artifact
+        if: inputs.pages-artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: html-docs
+          path: ${{ runner.temp }}/docs/artifact.tar
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload built docs as artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: ${{ !inputs.pages-artifact }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: html-docs
           path: docs/_build/html
 
       - name: Upload Exit Status
-        if: always()
-        uses: ./.github/actions/upload-exitstatus
+        if: ${{ !cancelled() }}
+        uses: $/.github/actions/upload-exitstatus

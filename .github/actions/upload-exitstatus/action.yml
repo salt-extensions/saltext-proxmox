@@ -15,17 +15,18 @@ runs:
   steps:
 
       - name: Set Exit Status
-        if: always()
+        if: ${{ !cancelled() }}
         env:
+          JOB_STATUS: ${{ job.status }}
           OUTFILE: exitstatus/${{ inputs.name == '' && github.job || inputs.name }}
         shell: bash
         run: |
           mkdir exitstatus
-          echo "${{ job.status }}" > "$OUTFILE"
+          echo "${JOB_STATUS}" > "$OUTFILE"
 
       - name: Upload Exit Status
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ${{ inputs.artifact_prefix }}${{ inputs.name == '' && github.job || inputs.name }}
           path: exitstatus

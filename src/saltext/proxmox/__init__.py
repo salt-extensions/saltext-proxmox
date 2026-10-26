@@ -5,7 +5,7 @@ PACKAGE_ROOT = pathlib.Path(__file__).resolve().parent
 try:
     from .version import __version__
 except ImportError:  # pragma: no cover
-    __version__ = "0.0.0.not-installed"
+    __version__: str = "0.0.0.not-installed"
     try:
         from importlib.metadata import version, PackageNotFoundError
 
@@ -16,7 +16,10 @@ except ImportError:  # pragma: no cover
             pass
     except ImportError:
         try:
-            from pkg_resources import get_distribution, DistributionNotFound
+            from pkg_resources import (  # type: ignore
+                get_distribution,
+                DistributionNotFound,
+            )
 
             try:
                 __version__ = get_distribution(__name__).version

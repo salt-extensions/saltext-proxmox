@@ -3,11 +3,6 @@ name: Prepare Release PR
 
 on:
   workflow_call:
-    secrets:
-      AUTORELEASE_CLID:
-        required: false
-      AUTORELEASE_PRIV:
-        required: false
   workflow_dispatch:
     inputs:
       version:
@@ -16,47 +11,40 @@ on:
         default: ''
         type: string
 
+concurrency:
+  group: prepare-release-pr
+  cancel-in-progress: true
+
+permissions: {}
+
 jobs:
   update-release:
     name: Render changelog and create/update PR
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write  # Create/update autorelease branch
+      pull-requests: write  # Create autorelease PR
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
 
     steps:
-      # We support running with and without a dedicated app.
-      # Registering a dedicated app allows CI to run on the release PR.
-      - name: Check if autorelease app was setup
-        id: check-app
-        env:
-          AUTORELEASE_CLID: ${{ secrets.AUTORELEASE_CLID }}
-          AUTORELEASE_PRIV: ${{ secrets.AUTORELEASE_PRIV }}
-        run: |-
-          if [ -n "$AUTORELEASE_CLID" ] && [ -n "$AUTORELEASE_PRIV" ]; then
-            echo "available=1" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=0" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Generate autorelease token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
-        if: steps.check-app.outputs.available == '1'
-        id: generate-token
-        with:
-          app-id: ${{ secrets.AUTORELEASE_CLID }}
-          private-key: ${{ secrets.AUTORELEASE_PRIV }}
 
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          python-version: '3.11'
+          persist-credentials: false
 
-      - name: Install project
+      - name: Set up Python 3.14
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: '3.14'
+
+      - name: Install towncrier
+        # Rendering the changelog does not require the project itself since
+        # [tool.towncrier] sets the name explicitly and the version is passed below.
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install '.[changelog]' pre-commit
+          python -m pip install "towncrier==${TOWNCRIER_VERSION}"
+        env:
+          TOWNCRIER_VERSION: '26.9.0'
 
       - name: Get next version
         if: github.event_name != 'workflow_dispatch' || inputs.version == ''
@@ -66,16 +54,14 @@ jobs:
       - name: Update CHANGELOG.md
         env:
           NEXT_VERSION: ${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && inputs.version || steps.next-version.outputs.version }}
-        run: towncrier build --yes --version "${NEXT_VERSION}"
-
-      - name: Run pre-commit once to remove trailing whitespace
         run: |
-          python -m pre_commit run --files=CHANGELOG.md || true
+          towncrier build --yes --version "${NEXT_VERSION}"
+          sed -i -e 's/[[:space:]]*$//' CHANGELOG.md  # Remove trailing whitespace
 
       - name: Create/update release PR
+        # zizmor: ignore[superfluous-actions] Handles signed commits and idempotent PR updates.
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
         with:
-          token: ${{ steps.check-app.outputs.available == '1' && steps.generate-token.outputs.token || github.token }}
           commit-message: Release v${{ (github.event_name == 'workflow_dispatch' && inputs.version != '') && inputs.version || steps.next-version.outputs.version }}
           branch: release/auto
           sign-commits: true
@@ -91,5 +77,5 @@ jobs:
             You can still follow the manual release procedure outlined in: https://salt-extensions.github.io/salt-extension-copier/topics/publishing.html
 
       - name: Upload Exit Status
-        if: always()
-        uses: ./.github/actions/upload-exitstatus
+        if: ${{ !cancelled() }}
+        uses: $/.github/actions/upload-exitstatus
