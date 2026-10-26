@@ -3,11 +3,20 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ''
+
+permissions: {}
 
 jobs:
   get-changed-files:
     name: Get Changed Files
-    uses: ./.github/workflows/get-changed-files.yml
+    uses: $/.github/workflows/get-changed-files.yml
+    with:
+      checkout-ref: ${{ inputs.checkout-ref || github.sha }}
     permissions:
       contents: read
       pull-requests: read  # for dorny/paths-filter to read pull requests
@@ -16,9 +25,10 @@ jobs:
     name: Pre-Commit
     needs:
       - get-changed-files
-    uses: ./.github/workflows/pre-commit-action.yml
+    uses: $/.github/workflows/pre-commit-action.yml
     with:
       changed-files: ${{ needs.get-changed-files.outputs.changed-files }}
+      checkout-ref: ${{ inputs.checkout-ref || github.sha }}
     permissions:
       contents: read
 
@@ -26,13 +36,20 @@ jobs:
     name: Test
     needs:
       - pre-commit
-    uses: ./.github/workflows/test-action.yml
+    uses: $/.github/workflows/test-action.yml
+    with:
+      checkout-ref: ${{ inputs.checkout-ref || github.sha }}
+    permissions:
+      contents: read
+      id-token: write  # codecov uploads
 
   docs:
     name: Docs
     needs:
       - pre-commit
-    uses: ./.github/workflows/docs-action.yml
+    uses: $/.github/workflows/docs-action.yml
+    with:
+      checkout-ref: ${{ inputs.checkout-ref || github.sha }}
     permissions:
       contents: read
 
@@ -40,6 +57,8 @@ jobs:
     name: Python Package
     needs:
       - pre-commit
-    uses: ./.github/workflows/package-action.yml
+    uses: $/.github/workflows/package-action.yml
+    with:
+      checkout-ref: ${{ inputs.checkout-ref || github.sha }}
     permissions:
       contents: read

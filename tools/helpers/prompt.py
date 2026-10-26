@@ -14,8 +14,8 @@ def ensure_utf8():
     if platform.system() != "Windows":
         return
     for stream in (sys.stdout, sys.stderr):
-        if stream.encoding != "utf-8":
-            stream.reconfigure(encoding="utf-8")
+        if stream is not None and stream.encoding != "utf-8":
+            stream.reconfigure(encoding="utf-8")  # type: ignore
 
 
 def pprint(msg, bold=False, fg=None, bg=None, stream=None, force_print=False):

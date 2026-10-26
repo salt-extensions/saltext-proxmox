@@ -4,25 +4,30 @@ name: Set the CI Pipeline Exit Status
 on:
   workflow_call:
 
+permissions: {}
+
 jobs:
   set-pipeline-exit-status:
     # This step is just so we can make github require this step, to pass checks
     # on a pull request instead of requiring all
     name: Set the CI Pipeline Exit Status
-    runs-on: ubuntu-24.04
-    if: always()
+    runs-on: ubuntu-26.04
+    # Runs also when dependencies failed or were skipped, but not when
+    # the whole run was cancelled, allowing cancellation to take effect
+    # immediately (always() would resist it)
+    if: ${{ !cancelled() }}
 
     steps:
       - name: Download Exit Status Files
-        if: always()
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        if: ${{ !cancelled() }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           path: exitstatus
           pattern: exitstatus-*
           merge-multiple: true
 
       - name: Delete Exit Status Artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         uses: geekyeggo/delete-artifact@176a747ab7e287e3ff4787bf8a148716375ca118  # v6.0.0
         with:
           name: exitstatus-*
@@ -30,12 +35,12 @@ jobs:
           failOnError: false
 
       - name: Set Pipeline Exit Status
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           tree exitstatus
           grep -RE 'failure|cancelled' exitstatus/ && exit 1 || exit 0
 
       - name: Done
-        if: always()
-        run:
+        if: ${{ !cancelled() }}
+        run: |
           echo "All workflows finished"

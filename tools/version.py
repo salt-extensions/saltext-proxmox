@@ -66,6 +66,8 @@ def get_next_version(last):
     major = minor = False
 
     for fragment in CHANGELOG_DIR.glob("[!.]*"):
+        if not fragment.is_file():
+            continue
         name = fragment.name.lower()
         if ".added" in name:
             minor = True

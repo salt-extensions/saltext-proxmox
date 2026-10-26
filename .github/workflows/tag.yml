@@ -12,20 +12,39 @@ on:
     tags:
       - "v*"  # Only tags starting with "v" for "v1.0.0", etc.
 
+cache-mode: none
+
+concurrency:
+  # Guard against duplicate runs for the same tag (e.g. after deleting
+  # and re-pushing it). Never cancel a release in progress.
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+permissions: {}
+
 jobs:
   get_version_tag:
     name: Extract version from tag
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.get_version_tag.outputs.version }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Extract version from tag name
         id: get_version_tag
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+        run: |
+          version="${GITHUB_REF#refs/tags/v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Invalid version: $version"
+            exit 1
+          }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Ensure changelog was rendered
         env:
@@ -34,26 +53,18 @@ jobs:
           test "$VERSION" = "$(python tools/version.py)" && \
           test -z "$(find changelog -type f -not -name '.*' -print -quit)"
 
-      - name: Write version file
-        env:
-          VERSION: ${{ steps.get_version_tag.outputs.version }}
-        run: echo -n "$VERSION" > "$RUNNER_TEMP/version.txt"
-
-      - name: Upload version
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          archive: false
-          path: ${{ runner.temp }}/version.txt
-
   close_autopr_on_tag:
     name: Close release PR on manual tag
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write       # Delete autorelease branch
+      pull-requests: write  # Close autorelease PR
     needs:
       - get_version_tag
 
     steps:
       - name: Find Pull Request
-        uses: juliangruber/find-pull-request-action@92b38d91ef26fd0f47374257f50e78432359a45f  # v1.11.1
+        uses: juliangruber/find-pull-request-action@0d2ca757412e2742b5cd5ce4ff56757c65652605  # v1.12.0
         id: find-pull-request
         with:
           branch: release/auto
@@ -64,20 +75,13 @@ jobs:
         if: steps.find-pull-request.outputs.number != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.find-pull-request.outputs.number }}
+          VERSION_TAG: ${{ needs.get_version_tag.outputs.version }}
         run: |
           gh pr close \
-            --comment "This release was triggered manually as v${{ needs.get_version_tag.outputs.version }}" \
+            --comment "This release was triggered manually as v${VERSION_TAG}" \
             --delete-branch \
             --repo "$GITHUB_REPOSITORY" \
-            "${{ steps.find-pull-request.outputs.number }}"
+            "${PR_NUMBER}"
 
-  call_central_workflow:
-    needs:
-      - get_version_tag
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-      id-token: write
-      pull-requests: read
-
-  # Further jobs are run separately on `workflow_run` in deploy-package-action.yml
+  # Further jobs are run separately on `workflow_run` in initiate-release.yml

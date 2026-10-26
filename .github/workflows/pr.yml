@@ -4,20 +4,29 @@ name: Pull Request
 on:
   pull_request:
 
+concurrency:
+  # Abort obsolete runs when the PR is updated with new commits
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
 jobs:
   call_central_workflow:
     name: CI
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
     permissions:
       contents: read
-      id-token: write
-      pull-requests: read
+      id-token: write      # codecov upload
+      pull-requests: read  # get changed files
 
   set_resolution:
     # This step is just so we can make github require this step, to pass checks
     # on a pull request instead of requiring all
     name: Set the CI Pipeline Exit Status
-    if: always()
+    # Not always() since that would resist cancellation of the whole run
+    if: ${{ !cancelled() }}
     needs:
       - call_central_workflow
-    uses: ./.github/workflows/set-resolution-action.yml
+    uses: $/.github/workflows/set-resolution-action.yml
+    permissions: {}

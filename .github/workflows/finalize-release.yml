@@ -1,0 +1,278 @@
+
+# Finalizes a successfully published release:
+# creates the GitHub release and deploys the docs.
+#
+# The publishing workflow has already verified the release authorization
+# and uploaded the verified manifest as the release handoff. Since
+# `workflow_run` workflows always execute the default branch's definition
+# and artifacts can only be uploaded by a run itself, verifying the
+# triggering run's identity (path + event) makes the handoff trustworthy.
+---
+name: Finalize Release
+
+on:
+  # zizmor: ignore[dangerous-triggers]
+  # `workflow_run` selects triggering runs by display name only, which a pull
+  # request can claim by adding a `pull_request`-triggered workflow of the same
+  # name. The trigger alone therefore grants no trust - the `verify` job below
+  # verifies the triggering run's provenance before anything is touched.
+  workflow_run:
+    types:
+      - completed
+    workflows:
+      - Release Salt Extension Python Package
+    branches:
+      - main  # This workflow's trigger always executes in the default branch context
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+  queue: max
+
+cache-mode: none
+permissions: {}
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-26.04
+
+    # Only accept runs of the actual publishing workflow, identified by its
+    # file path and trigger, never by name alone. A pull request cannot forge
+    # the `workflow_run` event: such workflows only ever execute the default
+    # branch's definition.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.repository.full_name == github.repository &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'workflow_run' &&
+      github.event.workflow_run.path == '.github/workflows/deploy-package-action.yml' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+
+    permissions:
+      actions: read  # List release artifacts and download them from different runs
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DEPLOY_RUN_ID: ${{ github.event.workflow_run.id }}
+
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+      initiate_run_id: ${{ steps.release.outputs.initiate_run_id }}
+
+    steps:
+      # The triggering workflow also completes successfully when all its
+      # jobs were skipped, e.g. because its own triggering run did not
+      # initiate a release. In that case, nothing was published and this
+      # workflow has nothing to do.
+      - name: Check triggering workflow for release handoff
+        id: check
+        run: |
+          set -euo pipefail
+
+          artifacts="$(gh api --paginate \
+            "repos/${GH_REPO}/actions/runs/${DEPLOY_RUN_ID}/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false).name')"
+
+          if grep -qx 'release-handoff' <<< "$artifacts"; then
+            echo "available=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::No release handoff found, assuming the triggering run did not publish a release."
+          fi
+
+      - name: Download release handoff
+        if: steps.check.outputs.available == '1'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: release-handoff
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/handoff
+
+      - name: Read release handoff
+        if: steps.check.outputs.available == '1'
+        id: release
+        env:
+          MANIFEST: ${{ runner.temp }}/handoff/manifest.json
+        run: |
+          set -euo pipefail
+
+          jq -e --arg repo "$GH_REPO" '
+            .schema_version == 1
+            and .repository == $repo
+          ' "$MANIFEST" > /dev/null
+
+          tag="$(jq -er '.tag' "$MANIFEST")"
+          commit="$(jq -er '.commit' "$MANIFEST")"
+          initiate_run_id="$(jq -er '.initiate_run_id' "$MANIFEST")"
+
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$initiate_run_id" =~ ^[1-9][0-9]*$ ]] || exit 1
+
+          echo "Verified release: $tag ($commit)"
+
+          {
+            echo "tag=$tag"
+            echo "commit=$commit"
+            echo "initiate_run_id=$initiate_run_id"
+          } >> "$GITHUB_OUTPUT"
+
+      # The documentation is already packaged as a Pages-compatible
+      # artifact.tar, which we re-upload unchanged for deployment.
+      - name: Download documentation
+        if: steps.check.outputs.available == '1'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: html-docs
+          run-id: ${{ steps.release.outputs.initiate_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/docs
+
+      - name: Upload GitHub Pages artifact
+        if: steps.check.outputs.available == '1'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/docs/artifact.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy-docs:
+    name: Deploy documentation
+    needs: verify
+    runs-on: ubuntu-26.04
+    # Skip when the triggering workflow did not publish a release.
+    if: needs.verify.outputs.tag != ''
+
+    permissions:
+      pages: write     # Pages deployment
+      id-token: write  # Pages deployment
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1
+
+  github-release:
+    name: Create GitHub release
+    needs: verify
+    runs-on: ubuntu-26.04
+    # Skip when the triggering workflow did not publish a release.
+    if: needs.verify.outputs.tag != ''
+
+    permissions:
+      actions: read    # Download artifact from the initiating run
+      contents: write  # Create GitHub release
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.verify.outputs.tag }}
+      RELEASE_COMMIT: ${{ needs.verify.outputs.commit }}
+
+    steps:
+      - name: Download verified packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: salt-extension-packages
+          run-id: ${{ needs.verify.outputs.initiate_run_id }}
+          github-token: ${{ github.token }}
+          path: dist/
+
+      - name: Create GitHub release
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          files=(dist/*)
+
+          (( ${#files[@]} > 0 )) || {
+            echo "::error::No distribution artifacts found"
+            exit 1
+          }
+
+          # Verify that the release tag still points to the authorized commit.
+          ref="$(gh api "repos/${GH_REPO}/git/ref/tags/${RELEASE_TAG}")"
+          [[ "$(jq -r '.ref' <<< "$ref")" == "refs/tags/${RELEASE_TAG}" ]] || exit 1
+          sha="$(jq -er '.object.sha' <<< "$ref")"
+          type="$(jq -er '.object.type' <<< "$ref")"
+
+          # Dereference annotated tags.
+          for _ in 1 2 3 4; do
+            [[ "$type" == "tag" ]] || break
+
+            object="$(gh api "repos/${GH_REPO}/git/tags/${sha}")"
+            sha="$(jq -er '.object.sha' <<< "$object")"
+            type="$(jq -er '.object.type' <<< "$object")"
+          done
+
+          [[ "$type" == "commit" && "$sha" == "$RELEASE_COMMIT" ]] || {
+            echo "::error::Release tag does not point to the authorized commit"
+            exit 1
+          }
+
+          # Create the release if it does not exist.
+          if ! release="$(gh api "repos/${GH_REPO}/releases/tags/${RELEASE_TAG}" 2>/dev/null)"; then
+            gh release create "$RELEASE_TAG" \
+              --repo="$GH_REPO" \
+              --verify-tag \
+              --title="${GH_REPO#*/} ${RELEASE_TAG#v}" \
+              --generate-notes \
+              "${files[@]}"
+
+            exit 0
+          fi
+
+          # Verify the existing release.
+          jq -e --arg tag "$RELEASE_TAG" '
+            .tag_name == $tag
+            and .draft == false
+            and .prerelease == false
+          ' <<< "$release" > /dev/null || {
+            echo "::error::Existing GitHub release does not match"
+            exit 1
+          }
+
+          # Only upload missing assets. Existing assets must match exactly.
+          missing=()
+
+          for file in "${files[@]}"; do
+            name="$(basename "$file")"
+            digest="sha256:$(sha256sum "$file" | cut -d' ' -f1)"
+
+            existing="$(jq -r --arg name "$name" '
+              [.assets[] | select(.name == $name)]
+              | if length == 0 then "" elif length == 1 then .[0].digest // "" else error("Duplicate assets") end
+            ' <<< "$release")"
+
+            if [[ -z "$existing" ]]; then
+              # Reject a matching asset whose digest is unavailable.
+              if jq -e --arg name "$name" \
+                'any(.assets[]; .name == $name)' <<< "$release" > /dev/null; then
+                echo "::error::Existing asset has no SHA-256 digest: $name"
+                exit 1
+              fi
+
+              missing+=("$file")
+            elif [[ "$existing" != "$digest" ]]; then
+              echo "::error::Existing release asset differs: $name"
+              exit 1
+            else
+              echo "Verified existing asset: $name"
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            gh release upload "$RELEASE_TAG" "${missing[@]}" \
+              --repo "$GH_REPO"
+          fi
+
+          echo "GitHub release verified: $RELEASE_TAG ($RELEASE_COMMIT)"

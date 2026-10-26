@@ -1,14 +1,14 @@
 [build-system]
 requires = [
-    "wheel",
-    "setuptools>=50.3.2",
-    "setuptools_scm[toml]>=3.4",
+    "setuptools>=77.0.3",
+    "setuptools_scm>=8",
 ]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "src/saltext/proxmox/version.py"
-write_to_template = "__version__ = \"{version}\"\n"
+version_file = "src/saltext/proxmox/version.py"
+version_file_template = "__version__ = \"{version}\"\n"
+fallback_version = "0.0.0"
 
 [project]
 name = "saltext.proxmox"
@@ -19,25 +19,24 @@ authors = [
 keywords = [
     "salt-extension",
 ]
-license = {text = "Apache Software License"}
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python",
-    "Programming Language :: Cython",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
 ]
-requires-python = ">= 3.10"
+requires-python = ">= 3.11"
 dynamic = ["version"]
 dependencies = [
-    "salt>=3006",
     "requests>=2.2.1",
 ]
 
@@ -51,35 +50,51 @@ Documentation = "https://salt-extensions.github.io/saltext-proxmox/"
 Source = "https://github.com/salt-extensions/saltext-proxmox"
 Tracker = "https://github.com/salt-extensions/saltext-proxmox/issues"
 
+# Salt is deliberately not a hard requirement: it is expected to be
+# provided by the target environment (onedir, OS package). Declaring
+# it as one would make pip resolve the preinstalled Salt's dependency
+# metadata, attempting to replace environment-provided dependencies
+# with PyPI releases or even upgrade Salt inside a onedir. The extra
+# allows opting in for pip-managed environments.
 [project.optional-dependencies]
-changelog = ["towncrier==25.8.0"]
-dev = [
-    "nox[uv]>=2024.3,!=2025.05.01",
-    "pre-commit>=2.21.0",
+salt = [
+    "salt>=3006",
+]
+
+[dependency-groups]
+dev_all = [
+    {include-group = "dev_extra"},
+    {include-group = "dev_required"},
+    {include-group = "docs"},
+    {include-group = "tests"},
+]
+dev_required = [
+    "nox[uv]>=2026.07.11",
+    "prek>=0.5.5 ; sys_platform == 'linux' or sys_platform == 'darwin' or sys_platform == 'win32'",
+    "pre-commit>=3.0.0 ; sys_platform != 'linux' and sys_platform != 'darwin' and sys_platform != 'win32'",
 ]
 # These dependencies are used in automations. It can be helpful
 # to have them installed in the dev venv, e.g. for editor integration.
-# When initializing the dev env using the included automation, pass
-# `--extras` to install them automatically.
 dev_extra = [
-    "black==26.5.1",
-    "isort==8.0.1",
-    "coverage==7.14.3",
+    "black==26.10.1",
+    "isort==9.0.2",
+    "coverage==7.17.0",
 ]
 docs = [
   "sphinx",
   "sphinx-prompt",
-  "sphinxcontrib-spelling",
   "sphinx-copybutton",
-  "towncrier==25.8.0",
+  "towncrier==26.9.0",
   "sphinxcontrib-towncrier",
   "myst_parser",
   "furo",
   "sphinx-inline-tabs",
 ]
-docsauto = ["sphinx-autobuild"]
+docsauto = ["sphinx-autobuild", {include-group = "docs"}]
+# coverage itself is installed separately to respect COVERAGE_REQUIREMENT
+coverageauto = ["livereload"]
 lint = [
-    "pylint==4.0.4",
+    "pylint==4.1.3",
 ]
 tests = [
     "pytest>=7.2.0",
@@ -90,31 +105,16 @@ tests = [
 [project.entry-points."salt.loader"]
 "saltext.proxmox" = "saltext.proxmox"
 
-[tool.uv]
-# Salt's legacy setup.py requires old setuptools.
-# Since uv 0.6.0, it does not fall back to reading requirements from egg-info.
-build-constraint-dependencies = ["setuptools<69"]
-
 [tool.setuptools]
-zip-safe = false
 include-package-data = true
-platforms = ["any"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 exclude = ["tests"]
 
-[tool.distutils.bdist_wheel]
-# Use this option if your package is pure-python
-universal = 1
-
 [tool.distutils.sdist]
 owner = "root"
 group = "root"
-
-[tool.build_sphinx]
-source_dir = "docs"
-build_dir = "build/sphinx"
 
 [tool.black]
 line-length = 100
@@ -125,8 +125,20 @@ skip = ["src/saltext/proxmox/__init__.py"]
 profile = "black"
 line_length = 100
 
+[tool.mdformat]
+wrap = 70
+# Requires Python 3.13, enforced in pre-commit config instead.
+# exclude = [
+#     "changelog/*",
+#     "**/CHANGELOG.md",
+#     "**/*.github*/**",
+# ]
+
 [tool.towncrier]
 package = "saltext.proxmox"
+# An explicit name keeps towncrier from importing the package,
+# allowing it to run without the project installed (release automation).
+name = "saltext.proxmox"
 filename = "CHANGELOG.md"
 template = "changelog/.template.jinja"
 directory = "changelog/"
@@ -138,6 +150,11 @@ issue_format = "[#{issue}](https://github.com/salt-extensions/saltext-proxmox/is
 [[tool.towncrier.type]]
 directory = "breaking"
 name = "Breaking changes"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
 showcontent = true
 
 [[tool.towncrier.type]]
@@ -156,44 +173,190 @@ name = "Changed"
 showcontent = true
 
 [[tool.towncrier.type]]
-directory = "fixed"
-name = "Fixed"
-showcontent = true
-
-[[tool.towncrier.type]]
 directory = "added"
 name = "Added"
 showcontent = true
 
 [[tool.towncrier.type]]
-directory = "security"
-name = "Security"
+directory = "fixed"
+name = "Fixed"
 showcontent = true
+
+[tool.coverage.run]
+branch = true
+concurrency = ["multiprocessing"]
+cover_pylib = false
+parallel = true
+relative_files = true
+
+omit = [
+    ".nox/*",
+]
+
+[tool.coverage.report]
+ignore_errors = true
+
+# Regexes for lines to exclude from consideration
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if False:",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@(abc\\.)?abstractmethod",
+
+    # Add markers which exclude statements in between.
+    # Requires coverage>=7.6.0.
+    "no cover: start(?s:.)*?no cover: stop",
+]
+
+omit = [
+    ".nox/*",
+]
+
+[tool.coverage.paths]
+source = [
+    "saltext/proxmox",
+    "src/saltext/proxmox",
+]
+testsuite = [
+    "tests/",
+]
+
+[tool.pylint]
+jobs = 0
+py-version = "3.11"
+source-roots = ["src"]
+disable = [
+    "consider-using-f-string",
+    "duplicate-code",
+    "fixme",
+    "inconsistent-return-statements",
+    "keyword-arg-before-vararg",
+    "line-too-long",
+    "logging-fstring-interpolation",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "no-else-return",
+    "no-member",
+    "protected-access",
+    "redefined-argument-from-local",
+    "redefined-builtin",
+    "redefined-outer-name",
+    "too-few-public-methods",
+    "too-many-boolean-expressions",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-lines",
+    "too-many-locals",
+    "too-many-nested-blocks",
+    "too-many-positional-arguments",
+    "too-many-return-statements",
+    "too-many-statements",
+    "ungrouped-imports",
+    "wrong-import-position"
+]
+enable = ["c-extension-no-member"]
+
+[tool.pylint.design]
+max-args = 35
+max-attributes = 15
+max-bool-expr = 8
+max-branches = 48
+max-locals = 40
+max-public-methods = 25
+max-returns = 10
+max-statements = 100
+
+[tool.pylint.format]
+expected-line-ending-format = "LF"
+max-line-length = 120
+max-module-lines = 3000
+
+[tool.pylint.miscellaneous]
+check-fixme-in-docstring = true
+
+[tool.pylint.variables]
+additional-builtins = [
+    "__active_provider_name__",
+    "__context__",
+    "__env__",
+    "__events__",
+    "__executors__",
+    "__ext_pillar__",
+    "__file_client__",
+    "__grains__",
+    "__instance_id__",
+    "__jid__",
+    "__jid_event__",
+    "__low__",
+    "__lowstate__",
+    "__minion__",
+    "__opts__",
+    "__pillar__",
+    "__proxy__",
+    "__reg__",
+    "__resource__",
+    "__resource_funcs__",
+    "__ret__",
+    "__runner__",
+    "__runners__",
+    "__running__",
+    "__salt__",
+    "__salt_system_encoding__",
+    "__sdb__",
+    "__serializers__",
+    "__states__",
+    "__tag__",
+    "__thorium__",
+    "__user__",
+]
 
 # While we currently don't use ruff for linting, it's helpful to include
 # these settings in case a user has setup ruff in their editor environment.
 [tool.ruff]
 builtins = [
-    "__opts__",
-    "__salt__",
-    "__pillar__",
-    "__grains__",
-    "__context__",
-    "__runner__",
-    "__ret__",
-    "__env__",
-    "__low__",
-    "__states__",
-    "__lowstate__",
-    "__running__",
     "__active_provider_name__",
-    "__master_opts__",
-    "__jid_event__",
-    "__instance_id__",
-    "__salt_system_encoding__",
-    "__proxy__",
-    "__serializers__",
-    "__reg__",
-    "__executors__",
+    "__context__",
+    "__env__",
     "__events__",
+    "__executors__",
+    "__ext_pillar__",
+    "__file_client__",
+    "__grains__",
+    "__instance_id__",
+    "__jid__",
+    "__jid_event__",
+    "__low__",
+    "__lowstate__",
+    "__minion__",
+    "__opts__",
+    "__pillar__",
+    "__proxy__",
+    "__reg__",
+    "__resource__",
+    "__resource_funcs__",
+    "__ret__",
+    "__runner__",
+    "__runners__",
+    "__running__",
+    "__salt__",
+    "__salt_system_encoding__",
+    "__sdb__",
+    "__serializers__",
+    "__states__",
+    "__tag__",
+    "__thorium__",
+    "__user__",
 ]
+
+[tool.ruff.lint.isort]
+force-single-line = true

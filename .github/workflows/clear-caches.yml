@@ -1,0 +1,36 @@
+---
+name: Clear Actions Caches
+
+on:
+  workflow_dispatch:
+    inputs:
+      key:
+        description: Only delete the cache with this key. Deletes all caches when empty.
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  clear-caches:
+    name: Clear Actions Caches
+    runs-on: ubuntu-26.04
+    permissions:
+      actions: write  # Delete caches
+
+    steps:
+      - name: Clear caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ inputs.key }}
+        run: |
+          if [ -n "$KEY" ]; then
+            gh cache delete --repo "$GITHUB_REPOSITORY" -- "$KEY"
+          else
+            gh cache delete --repo "$GITHUB_REPOSITORY" --all --succeed-on-no-caches
+          fi

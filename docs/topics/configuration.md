@@ -1,19 +1,23 @@
 # Configuration
 
 ## Provider
-Set up the cloud configuration at `/etc/salt/cloud.providers` or `/etc/salt/cloud.providers.d/proxmox.conf`:
+
+Set up the cloud configuration at `/etc/salt/cloud.providers` or
+`/etc/salt/cloud.providers.d/proxmox.conf`:
 
 ```yaml
 my-proxmox-config:
   # Required parameters
-  user: myuser@pam  # or myuser@pve
+  user: myuser@pam # or myuser@pve
   token: myapitoken
   url: https://hypervisor.domain.tld:8006
   driver: proxmox
 ```
 
 ## Profile examples
+
 ### Create a new LXC container
+
 ```yaml
 my-lxc-container:
   provider: my-proxmox-config
@@ -27,15 +31,17 @@ my-lxc-container:
   create:
     # For parameters check https://<PROXMOX_URL>/pve-docs/api-viewer/index.html#/nodes/{node}/lxc
     vmid: 123
-    ostemplate:  local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
+    ostemplate: local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
     node: proxmox-node1
 
     hostname: my-lxc-container
-    net0: name=eth0,bridge=vmbr0,firewall=1,gw=192.168.101.1,ip=192.168.101.2/24,tag=101,type=veth
+    net0: >-
+      name=eth0,bridge=vmbr0,firewall=1,gw=192.168.101.1,ip=192.168.101.2/24,tag=101,type=veth
     password: supersecret
 ```
 
 ### Clone an existing LXC container
+
 ```yaml
 my-lxc-container:
   provider: my-proxmox-config
@@ -57,6 +63,7 @@ my-lxc-container:
 ```
 
 ### Create a new QEMU VM
+
 ```yaml
 my-qemu-vm:
   provider: my-proxmox-config
@@ -77,6 +84,7 @@ my-qemu-vm:
 ```
 
 ### Clone an existing QEMU VM
+
 ```yaml
 my-qemu-vm:
   provider: my-proxmox-config
