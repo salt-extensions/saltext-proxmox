@@ -229,7 +229,7 @@ repos:
         verbose: true
         additional_dependencies:
           # renovate:
-          - zizmor==1.31.1 ; sys_platform == 'linux' or sys_platform == 'darwin' or sys_platform == 'win32'
+          - zizmor==1.32.0 ; sys_platform == 'linux' or sys_platform == 'darwin' or sys_platform == 'win32'
 
   - repo: https://github.com/kjanat/actionlint
     rev: 08bb2c4f0d039744455b87aef1c647fb8b66d37b  # v1.17.0
